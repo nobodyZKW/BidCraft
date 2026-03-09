@@ -121,6 +121,7 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+运行后端
 ```bash
 #跳转到项目根目录
 #cd d:\zkw\study\工程实训
@@ -137,6 +138,7 @@ Backend URLs:
 
 ### 6.2 Start Frontend
 
+运行前端
 ```bash
 #跳转到项目根目录
 #cd d:\zkw\study\工程实训\frontend
