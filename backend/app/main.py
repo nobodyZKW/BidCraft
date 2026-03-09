@@ -11,7 +11,7 @@ from app.core.settings import settings
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
-    description="Procurement document generation MVP",
+    description="采购文件智能生成系统 MVP",
 )
 app.add_middleware(
     CORSMiddleware,

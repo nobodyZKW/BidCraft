@@ -3,15 +3,12 @@ from __future__ import annotations
 from pathlib import Path
 
 
-def _pdf_escape(text: str) -> str:
-    cleaned = "".join(ch if 32 <= ord(ch) <= 126 else "?" for ch in text)
-    return cleaned.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+def _fallback_pdf(content: str, output_path: Path) -> Path:
+    def _pdf_escape(text: str) -> str:
+        cleaned = "".join(ch if 32 <= ord(ch) <= 126 else "?" for ch in text)
+        return cleaned.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
 
-
-def write_simple_pdf(content: str, output_path: Path) -> Path:
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     lines = [line for line in content.splitlines() if line.strip()][:80] or [""]
-
     text_commands = ["BT", "/F1 11 Tf", "50 780 Td", "14 TL"]
     for line in lines:
         text_commands.append(f"({_pdf_escape(line)}) Tj")
@@ -35,7 +32,6 @@ def write_simple_pdf(content: str, output_path: Path) -> Path:
     header = b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n"
     offsets = []
     pdf = bytearray(header)
-
     for idx, obj in enumerate(objects, start=1):
         offsets.append(len(pdf))
         pdf.extend(f"{idx} 0 obj\n".encode("ascii"))
@@ -56,6 +52,50 @@ def write_simple_pdf(content: str, output_path: Path) -> Path:
             "%%EOF\n"
         ).encode("ascii")
     )
-
     output_path.write_bytes(bytes(pdf))
+    return output_path
+
+
+def write_simple_pdf(content: str, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from reportlab.lib.pagesizes import A4
+        from reportlab.pdfbase import pdfmetrics
+        from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+        from reportlab.pdfgen import canvas
+    except Exception:
+        return _fallback_pdf(content, output_path)
+
+    font_name = "STSong-Light"
+    try:
+        pdfmetrics.getFont(font_name)
+    except Exception:
+        pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+
+    c = canvas.Canvas(str(output_path), pagesize=A4)
+    width, height = A4
+    y = height - 40
+    c.setFont(font_name, 11)
+
+    for raw_line in content.splitlines():
+        line = raw_line.rstrip()
+        if not line:
+            y -= 16
+            if y < 50:
+                c.showPage()
+                c.setFont(font_name, 11)
+                y = height - 40
+            continue
+
+        # Simple wrap by character count to avoid text clipping.
+        chunks = [line[i : i + 48] for i in range(0, len(line), 48)] or [""]
+        for chunk in chunks:
+            c.drawString(40, y, chunk)
+            y -= 16
+            if y < 50:
+                c.showPage()
+                c.setFont(font_name, 11)
+                y = height - 40
+
+    c.save()
     return output_path

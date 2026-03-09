@@ -169,18 +169,15 @@ def generate_document(
     http_request: Request,
     service: ProjectService = Depends(get_project_service),
 ) -> GenerateDocumentResponse:
-    try:
-        result = service.generate_from_text(
-            project_name=request.project_name,
-            department=request.department,
-            raw_input_text=request.raw_input_text,
-            fmt=request.format,
-            mode=request.mode,
-            created_by=request.created_by,
-            operator_id=request.operator_id,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    result = service.generate_from_text(
+        project_name=request.project_name,
+        department=request.department,
+        raw_input_text=request.raw_input_text,
+        fmt=request.format,
+        mode=request.mode,
+        created_by=request.created_by,
+        operator_id=request.operator_id,
+    )
 
     return GenerateDocumentResponse(
         project_id=result["project_id"],
@@ -190,4 +187,7 @@ def generate_document(
         can_export_formal=result["can_export_formal"],
         preview_html=result["preview_html"],
         file_url=_to_public_file_url(http_request, result["file_path"]),
+        export_blocked=result["export_blocked"],
+        delivered_mode=result["delivered_mode"],
+        message=result["message"],
     )

@@ -12,7 +12,7 @@ def test_api_end_to_end_flow() -> None:
 
     create_resp = client.post(
         "/api/projects",
-        json={"project_name": "服务器采购项目", "department": "信息部"},
+        json={"project_name": "Server Procurement", "department": "IT"},
     )
     assert create_resp.status_code == 201
     project_id = create_resp.json()["project_id"]
@@ -20,33 +20,25 @@ def test_api_end_to_end_flow() -> None:
     extract_resp = client.post(
         f"/api/projects/{project_id}/extract",
         json={
-            "raw_input_text": "服务器采购项目，预算300万元，45天交付，付款30/60/10，验收按国家标准，质保24个月，供应商需具备相关资质。",
+            "raw_input_text": (
+                "Server procurement project, budget 3000000 CNY, "
+                "delivery 45 days, payment 30/60/10, "
+                "acceptance by test report, warranty 24 months."
+            ),
         },
     )
     assert extract_resp.status_code == 200
-    extract_data = extract_resp.json()
-    assert extract_data["missing_fields"] == []
+    assert extract_resp.json()["missing_fields"] == []
 
-    match_resp = client.post(
-        f"/api/projects/{project_id}/clauses/match",
-        json={},
-    )
+    match_resp = client.post(f"/api/projects/{project_id}/clauses/match", json={})
     assert match_resp.status_code == 200
-    sections = match_resp.json()["sections"]
-    assert len(sections) >= 4
+    assert len(match_resp.json()["sections"]) >= 4
 
-    validate_resp = client.post(
-        f"/api/projects/{project_id}/validate",
-        json={},
-    )
+    validate_resp = client.post(f"/api/projects/{project_id}/validate", json={})
     assert validate_resp.status_code == 200
-    validate_data = validate_resp.json()
-    assert validate_data["can_export_formal"] is True
+    assert validate_resp.json()["can_export_formal"] is True
 
-    render_resp = client.post(
-        f"/api/projects/{project_id}/render",
-        json={},
-    )
+    render_resp = client.post(f"/api/projects/{project_id}/render", json={})
     assert render_resp.status_code == 200
     assert render_resp.json()["preview_html"].startswith("<html>")
 
@@ -69,9 +61,12 @@ def test_generate_endpoint_runs_full_pipeline() -> None:
     resp = client.post(
         "/api/projects/generate",
         json={
-            "project_name": "存储设备采购项目",
-            "department": "信息部",
-            "raw_input_text": "存储设备采购项目，预算180万元，30天交付，付款20/70/10，验收按功能测试报告，质保24个月。",
+            "project_name": "Storage Procurement",
+            "department": "IT",
+            "raw_input_text": (
+                "Storage procurement, budget 1800000 CNY, delivery 30 days, "
+                "payment 20/70/10, acceptance by test report, warranty 24 months."
+            ),
             "format": "pdf",
             "mode": "draft",
         },
@@ -79,5 +74,35 @@ def test_generate_endpoint_runs_full_pipeline() -> None:
     assert resp.status_code == 200
     payload = resp.json()
     assert payload["project_id"]
-    assert "file_url" in payload
+    assert payload["file_url"]
     assert payload["preview_html"].startswith("<html>")
+    assert payload["export_blocked"] is False
+    assert payload["delivered_mode"] == "draft"
+
+
+def test_generate_formal_auto_fallback_to_draft() -> None:
+    client = TestClient(app)
+    resp = client.post(
+        "/api/projects/generate",
+        json={
+            "project_name": "High Risk Procurement",
+            "department": "IT",
+            "raw_input_text": (
+                "Procure servers, budget 3000000 CNY, delivery 30 days, "
+                "payment 70/20/10, warranty 6 months."
+            ),
+            "format": "docx",
+            "mode": "formal",
+        },
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["can_export_formal"] is False
+    assert payload["export_blocked"] is True
+    assert payload["delivered_mode"] == "draft"
+    assert payload["file_url"]
+    assert "已自动生成草稿版" in payload["message"]
+
+    parsed = urlparse(payload["file_url"])
+    file_resp = client.get(parsed.path)
+    assert file_resp.status_code == 200

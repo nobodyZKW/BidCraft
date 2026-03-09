@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from app.models.domain import ProjectStatus, RenderResult, ValidationResult
+from app.renderers.template_renderer import TemplateRenderer
+from app.repositories.project_repository import ProjectRepository
 from app.rules.rule_engine import RuleEngine
 from app.services.clause_service import ClauseService
 from app.services.export_service import ExportService
 from app.services.extraction_service import ExtractionService
-from app.renderers.template_renderer import TemplateRenderer
-from app.repositories.project_repository import ProjectRepository
 
 
 class ProjectService:
@@ -195,7 +195,6 @@ class ProjectService:
             raise ValueError("存在高风险项，禁止导出正式版。")
 
         version = self.project_repository.count_documents(project_id) + 1
-
         export_path = self.export_service.export(
             project_name=project.project_name,
             rendered_content=rendered_text,
@@ -254,13 +253,30 @@ class ProjectService:
             selected_clause_ids=[],
             operator_id=operator_id,
         )
-        file_path = self.export(
-            project_id=project.project_id,
-            fmt=fmt,
-            mode=mode,
-            selected_clause_ids=[],
-            operator_id=operator_id,
-        )
+
+        export_blocked = mode == "formal" and not validation.can_export_formal
+        delivered_mode = "draft" if export_blocked else mode
+        if export_blocked:
+            file_path = self.export(
+                project_id=project.project_id,
+                fmt=fmt,
+                mode="draft",
+                selected_clause_ids=[],
+                operator_id=operator_id,
+            )
+            message = (
+                "存在高风险项，已拦截正式版导出；"
+                "系统已自动生成草稿版，请使用下载链接获取。"
+            )
+        else:
+            file_path = self.export(
+                project_id=project.project_id,
+                fmt=fmt,
+                mode=mode,
+                selected_clause_ids=[],
+                operator_id=operator_id,
+            )
+            message = ""
 
         return {
             "project_id": project.project_id,
@@ -270,4 +286,7 @@ class ProjectService:
             "can_export_formal": validation.can_export_formal,
             "preview_html": render_result.preview_html,
             "file_path": file_path,
+            "export_blocked": export_blocked,
+            "delivered_mode": delivered_mode,
+            "message": message,
         }

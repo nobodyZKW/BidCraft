@@ -20,7 +20,10 @@ export type GenerateDocumentResponse = {
   risk_summary: RiskItem[];
   can_export_formal: boolean;
   preview_html: string;
-  file_url: string;
+  file_url: string | null;
+  export_blocked: boolean;
+  delivered_mode: "draft" | "formal";
+  message: string;
 };
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";

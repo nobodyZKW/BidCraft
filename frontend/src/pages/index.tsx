@@ -1,12 +1,9 @@
 import { CSSProperties, FormEvent, useMemo, useState } from "react";
 
-import {
-  GenerateDocumentResponse,
-  generateDocument,
-} from "../services/api";
+import { GenerateDocumentResponse, generateDocument } from "../services/api";
 
 const SAMPLE_TEXT =
-  "服务器采购项目，预算300万元，45天交付，付款30/60/10，验收按国家标准执行，质保24个月，供应商需具备相关资质和近三年同类业绩。";
+  "服务器采购项目，预算300万元，45天交付，付款30/60/10，验收按国家标准和测试报告执行，质保24个月，供应商需具备同类项目经验。";
 
 type ExportFormat = "docx" | "pdf";
 type ExportMode = "draft" | "formal";
@@ -63,7 +60,7 @@ export default function Home() {
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <h1 style={{ margin: "0 0 8px", fontSize: 40 }}>BidCraft AI</h1>
         <p style={{ margin: "0 0 24px", color: "#2f3a45" }}>
-          输入自然语言需求，后端自动完成抽取、条款匹配、校验、渲染和导出。
+          输入自然语言需求，系统会自动抽取、校验、渲染并导出文件。
         </p>
 
         <form
@@ -120,14 +117,14 @@ export default function Home() {
                 onChange={(e) => setMode(e.target.value as ExportMode)}
                 style={inputStyle}
               >
-                <option value="draft">draft</option>
-                <option value="formal">formal</option>
+                <option value="draft">草稿版</option>
+                <option value="formal">正式版</option>
               </select>
             </label>
           </div>
 
           <label style={{ display: "block" }}>
-            自然语言采购需求
+            自然语言需求
             <textarea
               value={rawText}
               onChange={(e) => setRawText(e.target.value)}
@@ -139,21 +136,21 @@ export default function Home() {
 
           <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
             <button type="submit" disabled={loading} style={buttonStyle}>
-              {loading ? "处理中..." : "一键生成文件"}
+              {loading ? "处理中..." : "一键生成"}
             </button>
             <button
               type="button"
               onClick={() => setRawText(SAMPLE_TEXT)}
               style={secondaryButtonStyle}
             >
-              填入示例
+              使用示例
             </button>
           </div>
         </form>
 
         {error && (
           <section style={{ ...panelStyle, borderColor: "#f2b5b5", background: "#fff2f2" }}>
-            <h3 style={{ marginTop: 0 }}>错误</h3>
+            <h3 style={{ marginTop: 0 }}>错误信息</h3>
             <pre style={{ marginBottom: 0, whiteSpace: "pre-wrap" }}>{error}</pre>
           </section>
         )}
@@ -162,18 +159,21 @@ export default function Home() {
           <>
             <section style={panelStyle}>
               <h2 style={{ marginTop: 0 }}>生成结果</h2>
-              <p>project_id: {result.project_id}</p>
-              <p>
-                can_export_formal:{" "}
-                <strong>{String(result.can_export_formal)}</strong>
-              </p>
-              <a href={result.file_url} target="_blank" rel="noreferrer">
-                下载文件
-              </a>
+              <p>项目ID：{result.project_id}</p>
+              <p>可导出正式版：<strong>{String(result.can_export_formal)}</strong></p>
+              <p>实际导出模式：<strong>{result.delivered_mode === "formal" ? "正式版" : "草稿版"}</strong></p>
+              {result.message ? <p style={{ color: "#a85a00" }}>{result.message}</p> : null}
+              {result.file_url ? (
+                <a href={result.file_url} target="_blank" rel="noreferrer">
+                  下载文件
+                </a>
+              ) : (
+                <p>未生成可下载文件。</p>
+              )}
             </section>
 
             <section style={panelStyle}>
-              <h3 style={{ marginTop: 0 }}>缺失项</h3>
+              <h3 style={{ marginTop: 0 }}>缺失字段</h3>
               {result.missing_fields.length === 0 ? (
                 <p>无</p>
               ) : (
@@ -204,10 +204,10 @@ export default function Home() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr>
-                      <th style={thStyle}>severity</th>
-                      <th style={thStyle}>code</th>
-                      <th style={thStyle}>message</th>
-                      <th style={thStyle}>location</th>
+                      <th style={thStyle}>级别</th>
+                      <th style={thStyle}>编码</th>
+                      <th style={thStyle}>说明</th>
+                      <th style={thStyle}>位置</th>
                     </tr>
                   </thead>
                   <tbody>

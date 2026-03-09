@@ -87,4 +87,7 @@ class GenerateDocumentResponse(BaseModel):
     risk_summary: list[RiskItem]
     can_export_formal: bool
     preview_html: str
-    file_url: str
+    file_url: str | None = None
+    export_blocked: bool = False
+    delivered_mode: str = "draft"
+    message: str = ""

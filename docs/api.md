@@ -6,6 +6,9 @@ Base URL: `http://127.0.0.1:8000`
 One-shot pipeline for frontend:
 create project -> extract -> match -> validate -> render -> export.
 
+If `mode=formal` is requested but high-severity risks are found, the API returns
+`200` with `export_blocked=true`, `delivered_mode=draft`, and a draft `file_url`.
+
 ## `POST /api/projects`
 Create project.
 
