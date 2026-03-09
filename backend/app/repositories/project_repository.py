@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -52,7 +52,7 @@ class ProjectRepository:
             raise KeyError(f"Project not found: {project_id}")
 
         item["status"] = status.value
-        item["updated_at"] = datetime.now(UTC).isoformat()
+        item["updated_at"] = datetime.now(timezone.utc).isoformat()
         projects[project_id] = item
         self.projects_store.save(projects)
         return Project.model_validate(item)

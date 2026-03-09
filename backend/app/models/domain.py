@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from datetime import date, datetime, timezone
 from enum import Enum
 from typing import Any
 
@@ -26,8 +26,8 @@ class Project(BaseModel):
     department: str
     status: ProjectStatus = ProjectStatus.draft
     created_by: str = "system"
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
-    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class RequirementSnapshot(BaseModel):
@@ -37,7 +37,7 @@ class RequirementSnapshot(BaseModel):
     structured_data: dict[str, Any]
     missing_fields: list[str]
     version: int
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Clause(BaseModel):
@@ -93,7 +93,7 @@ class DocumentVersion(BaseModel):
     risk_result: dict[str, Any]
     export_status: str
     file_urls: dict[str, str] = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class AuditEvent(BaseModel):
@@ -102,4 +102,4 @@ class AuditEvent(BaseModel):
     action: str
     before_snapshot: dict[str, Any]
     after_snapshot: dict[str, Any]
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
