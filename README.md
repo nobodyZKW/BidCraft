@@ -112,10 +112,19 @@ NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
 ## 6. Quick Start
 
 ### 6.1 Start Backend
+安装环境
+```bash
+# 在项目根目录执行
+#cd d:\zkw\study\工程实训
+python -m venv .venv
+.\.venv\Scripts\activate
+pip install -r requirements.txt
+```
 
 ```bash
-cd d:\zkw\study\工程实训
-pip install -r requirements.txt
+#跳转到项目根目录
+#cd d:\zkw\study\工程实训
+
 cd backend
 python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
@@ -129,7 +138,9 @@ Backend URLs:
 ### 6.2 Start Frontend
 
 ```bash
-cd d:\zkw\study\工程实训\frontend
+#跳转到项目根目录
+#cd d:\zkw\study\工程实训\frontend
+
 npm.cmd install
 npm.cmd run dev
 ```
