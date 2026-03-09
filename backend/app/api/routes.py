@@ -25,7 +25,7 @@ from app.schemas.api import (
 from app.services.project_service import ProjectService
 
 
-router = APIRouter(prefix="/api", tags=["bidcraft-mvp"])
+router = APIRouter(prefix="/api")
 
 
 def _to_public_file_url(request: Request, file_path: str) -> str:
@@ -33,7 +33,14 @@ def _to_public_file_url(request: Request, file_path: str) -> str:
     return str(request.base_url).rstrip("/") + f"/exports/{filename}"
 
 
-@router.post("/projects", response_model=CreateProjectResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/projects",
+    response_model=CreateProjectResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["项目管理"],
+    summary="创建项目",
+    description="创建一个采购项目，返回项目 ID。",
+)
 def create_project(
     request: CreateProjectRequest,
     service: ProjectService = Depends(get_project_service),
@@ -46,7 +53,13 @@ def create_project(
     return CreateProjectResponse(project_id=project.project_id)
 
 
-@router.get("/projects/{project_id}", response_model=ProjectResponse)
+@router.get(
+    "/projects/{project_id}",
+    response_model=ProjectResponse,
+    tags=["项目管理"],
+    summary="获取项目详情",
+    description="根据项目 ID 查询项目当前状态与元信息。",
+)
 def get_project(
     project_id: str,
     service: ProjectService = Depends(get_project_service),
@@ -58,7 +71,13 @@ def get_project(
     return ProjectResponse(project=project)
 
 
-@router.post("/projects/{project_id}/extract", response_model=ExtractResponse)
+@router.post(
+    "/projects/{project_id}/extract",
+    response_model=ExtractResponse,
+    tags=["抽取与生成"],
+    summary="抽取结构化需求",
+    description="提交自然语言采购需求，返回结构化数据、缺失字段和澄清问题。",
+)
 def extract(
     project_id: str,
     request: ExtractRequest,
@@ -82,7 +101,13 @@ def extract(
     )
 
 
-@router.post("/projects/{project_id}/clauses/match", response_model=MatchClausesResponse)
+@router.post(
+    "/projects/{project_id}/clauses/match",
+    response_model=MatchClausesResponse,
+    tags=["抽取与生成"],
+    summary="匹配候选条款",
+    description="根据结构化参数匹配章节条款，并返回备选条款。",
+)
 def match_clauses(
     project_id: str,
     request: MatchClausesRequest,
@@ -100,7 +125,13 @@ def match_clauses(
     return MatchClausesResponse(sections=sections)
 
 
-@router.post("/projects/{project_id}/validate", response_model=ValidateResponse)
+@router.post(
+    "/projects/{project_id}/validate",
+    response_model=ValidateResponse,
+    tags=["校验与导出"],
+    summary="运行合规校验",
+    description="执行硬规则与语义规则，返回风险列表和正式版导出许可标记。",
+)
 def validate(
     project_id: str,
     request: ValidateRequest,
@@ -122,7 +153,13 @@ def validate(
     )
 
 
-@router.post("/projects/{project_id}/render", response_model=RenderResponse)
+@router.post(
+    "/projects/{project_id}/render",
+    response_model=RenderResponse,
+    tags=["校验与导出"],
+    summary="渲染文档预览",
+    description="按模板与条款渲染文档，返回 HTML 预览与文档版本号。",
+)
 def render(
     project_id: str,
     request: RenderRequest,
@@ -141,7 +178,13 @@ def render(
     return RenderResponse(doc_version_id=result.doc_version_id, preview_html=result.preview_html)
 
 
-@router.post("/projects/{project_id}/export", response_model=ExportResponse)
+@router.post(
+    "/projects/{project_id}/export",
+    response_model=ExportResponse,
+    tags=["校验与导出"],
+    summary="导出文档",
+    description="导出 docx/pdf 文件。若请求 formal 且命中高风险，将返回 400。",
+)
 def export(
     project_id: str,
     request: ExportRequest,
@@ -163,7 +206,16 @@ def export(
     return ExportResponse(file_url=_to_public_file_url(http_request, file_path))
 
 
-@router.post("/projects/generate", response_model=GenerateDocumentResponse)
+@router.post(
+    "/projects/generate",
+    response_model=GenerateDocumentResponse,
+    tags=["抽取与生成"],
+    summary="一键生成文档",
+    description=(
+        "输入自然语言需求，自动执行创建项目、抽取、匹配、校验、渲染、导出全流程。"
+        "若 formal 模式被高风险拦截，会自动降级为 draft 并返回下载链接。"
+    ),
+)
 def generate_document(
     request: GenerateDocumentRequest,
     http_request: Request,
