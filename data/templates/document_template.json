@@ -1,0 +1,56 @@
+{
+  "sections": [
+    {
+      "id": "basic_info",
+      "title": "基本信息",
+      "content": "项目名称：{{project_name}}\n采购类型：{{procurement_type}}\n采购方式：{{method}}\n预算金额：{{budget_amount}} {{currency}}\n交付周期：{{delivery_days}}天"
+    },
+    {
+      "id": "bidder_instruction_public",
+      "title": "投标人须知",
+      "content": "本项目采用公开招标，评标方法为{{evaluation_method}}。"
+    },
+    {
+      "id": "qualification_section",
+      "title": "资格要求",
+      "content": "{{qualification_requirements}}"
+    },
+    {
+      "id": "technical_spec_section",
+      "title": "技术需求",
+      "content": "{{technical_requirements}}"
+    },
+    {
+      "id": "comprehensive_scoring_section",
+      "title": "评标办法",
+      "content": "本项目采用综合评分法，技术、商务、价格综合评分。"
+    },
+    {
+      "id": "attachments",
+      "title": "附件",
+      "content": "附件一：采购需求/技术需求\n附件二：廉洁承诺\n附件三：保密承诺"
+    }
+  ],
+  "rules": [
+    {
+      "when": {
+        "procurement_type": "goods"
+      },
+      "include": [
+        "basic_info",
+        "qualification_section",
+        "technical_spec_section",
+        "attachments"
+      ]
+    },
+    {
+      "when": {
+        "method": "public_tender"
+      },
+      "include": [
+        "bidder_instruction_public",
+        "comprehensive_scoring_section"
+      ]
+    }
+  ]
+}
