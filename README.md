@@ -73,6 +73,7 @@ npm run dev
 ```
 
 ## 5. 核心接口
+- `POST /api/projects/generate` (一键链路：创建->抽取->匹配->校验->渲染->导出)
 - `POST /api/projects`
 - `POST /api/projects/{project_id}/extract`
 - `POST /api/projects/{project_id}/clauses/match`

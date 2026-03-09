@@ -223,3 +223,51 @@ class ProjectService:
             after_snapshot={"file_path": str(export_path), "mode": mode, "format": fmt},
         )
         return str(export_path)
+
+    def generate_from_text(
+        self,
+        project_name: str,
+        department: str,
+        raw_input_text: str,
+        fmt: str,
+        mode: str,
+        created_by: str,
+        operator_id: str,
+    ) -> dict[str, Any]:
+        project = self.create_project(
+            project_name=project_name,
+            department=department,
+            created_by=created_by,
+        )
+        structured = self.extract(
+            project_id=project.project_id,
+            raw_input_text=raw_input_text,
+            operator_id=operator_id,
+        )
+        validation = self.validate(
+            project_id=project.project_id,
+            selected_clause_ids=[],
+            operator_id=operator_id,
+        )
+        render_result = self.render(
+            project_id=project.project_id,
+            selected_clause_ids=[],
+            operator_id=operator_id,
+        )
+        file_path = self.export(
+            project_id=project.project_id,
+            fmt=fmt,
+            mode=mode,
+            selected_clause_ids=[],
+            operator_id=operator_id,
+        )
+
+        return {
+            "project_id": project.project_id,
+            "missing_fields": structured.get("missing_fields", []),
+            "clarification_questions": structured.get("clarification_questions", []),
+            "risk_summary": validation.risk_summary,
+            "can_export_formal": validation.can_export_formal,
+            "preview_html": render_result.preview_html,
+            "file_path": file_path,
+        }

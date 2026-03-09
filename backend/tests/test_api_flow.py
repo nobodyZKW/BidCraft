@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi.testclient import TestClient
 
@@ -55,5 +55,29 @@ def test_api_end_to_end_flow() -> None:
         json={"format": "docx", "mode": "formal"},
     )
     assert export_resp.status_code == 200
-    path = Path(export_resp.json()["file_url"])
-    assert path.exists()
+    export_url = export_resp.json()["file_url"]
+    parsed = urlparse(export_url)
+    assert parsed.path.startswith("/exports/")
+
+    file_resp = client.get(parsed.path)
+    assert file_resp.status_code == 200
+    assert len(file_resp.content) > 0
+
+
+def test_generate_endpoint_runs_full_pipeline() -> None:
+    client = TestClient(app)
+    resp = client.post(
+        "/api/projects/generate",
+        json={
+            "project_name": "存储设备采购项目",
+            "department": "信息部",
+            "raw_input_text": "存储设备采购项目，预算180万元，30天交付，付款20/70/10，验收按功能测试报告，质保24个月。",
+            "format": "pdf",
+            "mode": "draft",
+        },
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert payload["project_id"]
+    assert "file_url" in payload
+    assert payload["preview_html"].startswith("<html>")

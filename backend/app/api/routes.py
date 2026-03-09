@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from app.api.dependencies import get_project_service
 from app.schemas.api import (
@@ -10,6 +12,8 @@ from app.schemas.api import (
     ExportResponse,
     ExtractRequest,
     ExtractResponse,
+    GenerateDocumentRequest,
+    GenerateDocumentResponse,
     MatchClausesRequest,
     MatchClausesResponse,
     ProjectResponse,
@@ -22,6 +26,11 @@ from app.services.project_service import ProjectService
 
 
 router = APIRouter(prefix="/api", tags=["bidcraft-mvp"])
+
+
+def _to_public_file_url(request: Request, file_path: str) -> str:
+    filename = Path(file_path).name
+    return str(request.base_url).rstrip("/") + f"/exports/{filename}"
 
 
 @router.post("/projects", response_model=CreateProjectResponse, status_code=status.HTTP_201_CREATED)
@@ -136,6 +145,7 @@ def render(
 def export(
     project_id: str,
     request: ExportRequest,
+    http_request: Request,
     service: ProjectService = Depends(get_project_service),
 ) -> ExportResponse:
     try:
@@ -150,4 +160,34 @@ def export(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return ExportResponse(file_url=file_path)
+    return ExportResponse(file_url=_to_public_file_url(http_request, file_path))
+
+
+@router.post("/projects/generate", response_model=GenerateDocumentResponse)
+def generate_document(
+    request: GenerateDocumentRequest,
+    http_request: Request,
+    service: ProjectService = Depends(get_project_service),
+) -> GenerateDocumentResponse:
+    try:
+        result = service.generate_from_text(
+            project_name=request.project_name,
+            department=request.department,
+            raw_input_text=request.raw_input_text,
+            fmt=request.format,
+            mode=request.mode,
+            created_by=request.created_by,
+            operator_id=request.operator_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return GenerateDocumentResponse(
+        project_id=result["project_id"],
+        missing_fields=result["missing_fields"],
+        clarification_questions=result["clarification_questions"],
+        risk_summary=result["risk_summary"],
+        can_export_formal=result["can_export_formal"],
+        preview_html=result["preview_html"],
+        file_url=_to_public_file_url(http_request, result["file_path"]),
+    )

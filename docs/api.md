@@ -2,6 +2,10 @@
 
 Base URL: `http://127.0.0.1:8000`
 
+## `POST /api/projects/generate`
+One-shot pipeline for frontend:
+create project -> extract -> match -> validate -> render -> export.
+
 ## `POST /api/projects`
 Create project.
 

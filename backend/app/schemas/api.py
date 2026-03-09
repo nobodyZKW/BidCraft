@@ -68,3 +68,23 @@ class ExportResponse(BaseModel):
 
 class ProjectResponse(BaseModel):
     project: Project
+
+
+class GenerateDocumentRequest(BaseModel):
+    project_name: str = Field(min_length=1)
+    department: str = Field(min_length=1)
+    raw_input_text: str = Field(min_length=1)
+    format: str = "docx"
+    mode: str = "draft"
+    created_by: str = "system"
+    operator_id: str = "system"
+
+
+class GenerateDocumentResponse(BaseModel):
+    project_id: str
+    missing_fields: list[str]
+    clarification_questions: list[str]
+    risk_summary: list[RiskItem]
+    can_export_formal: bool
+    preview_html: str
+    file_url: str
