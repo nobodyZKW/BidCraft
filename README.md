@@ -1,21 +1,61 @@
 # BidCraft AI (MVP)
 
-采购文件智能生成系统 MVP。  
-支持流程：需求输入 -> 结构化抽取 -> 条款匹配 -> 合规校验 -> 渲染预览 -> Word/PDF 导出。
+BidCraft AI is an MVP for procurement document generation.
+It takes free-form requirement text and turns it into a structured, validated, exportable procurement document.
 
-## 1. MVP 范围
-- 采购类型：`goods`
-- 采购方式：`public_tender`
-- 核心能力：
-  - 自然语言需求输入
-  - JSON Schema 结构化抽取
-  - 缺失项提示
-  - 条款自动匹配（版本化）
-  - 动态模板组装
-  - 基础合规规则校验（10+）
-  - `docx/pdf` 导出
+The system is designed to reduce drafting time, improve consistency, and block high-risk outputs from being exported as formal documents.
 
-## 2. 目录结构
+## 1. What This Project Does
+
+Input:
+- Natural language procurement requirement text
+
+Pipeline:
+1. Structured extraction (LLM + schema validation + fallback parser)
+2. Clause matching (versioned clause library)
+3. Template assembly (section + clause block composition)
+4. Rule validation (hard + semantic risk checks)
+5. Document rendering and export
+
+Output:
+- Preview HTML
+- Export file in `docx` or `pdf`
+- Risk summary and formal-export gate flag
+
+## 2. MVP Scope
+
+In scope:
+- Procurement type: `goods`
+- Method: `public_tender`
+- Exports: `docx`, `pdf`
+- Endpoints for create/extract/match/validate/render/export
+- One-shot endpoint for full pipeline generation
+
+Out of scope (future iterations):
+- Service/engineering procurement
+- Multi-language document generation
+- Approval workflow integration
+- OCR for scanned historical contracts
+
+## 3. Tech Stack
+
+Backend:
+- Python 3.12
+- FastAPI
+- Pydantic
+- jsonschema
+- reportlab (PDF rendering)
+
+Frontend:
+- Next.js
+- React
+- TypeScript
+
+Testing:
+- pytest
+
+## 4. Repository Structure
+
 ```text
 .
 ├─ backend/
@@ -37,68 +77,194 @@
 │  ├─ seeds/
 │  └─ runtime/
 ├─ docs/
+├─ exports/
 ├─ frontend/
 ├─ .env.example
-├─ AGENTS.md
-├─ plans.md
-└─ implement.md
+└─ requirements.txt
 ```
 
-## 3. API Key 使用说明（DeepSeek）
-系统优先读取 `config/config.py` 中的 `DEEPSEEK_API_KEY`（或 `API_KEY`）。  
-你已配置的 `config/config.py` 会被 `backend/app/core/settings.py` 自动加载。
+## 5. Configuration
 
-也可通过环境变量覆盖：
-- `DEEPSEEK_API_KEY`
-- `DEEPSEEK_BASE_URL`
-- `DEEPSEEK_MODEL`
+### 5.1 API Key Priority
 
-## 4. 安装与运行
-### 4.1 后端
+The backend loads DeepSeek API key in this order:
+1. Environment variable `DEEPSEEK_API_KEY`
+2. `config/config.py`:
+   - `DEEPSEEK_API_KEY`, or
+   - `API_KEY`
+
+Main loader:
+- `backend/app/core/settings.py`
+
+### 5.2 Environment Variables
+
+See `.env.example`:
+
+```env
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-chat
+MAX_ADVANCE_PAYMENT_PERCENT=50
+REQUEST_TIMEOUT_SECONDS=30
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8000
+```
+
+## 6. Quick Start
+
+### 6.1 Start Backend
+
 ```bash
+cd d:\zkw\study\工程实训
 pip install -r requirements.txt
 cd backend
-python -m uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Swagger/OpenAPI:
-- `http://127.0.0.1:8000/docs`
-- `http://127.0.0.1:8000/openapi.json`
+Backend URLs:
+- Home: `http://127.0.0.1:8000/`
+- Swagger: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
+- Health: `http://127.0.0.1:8000/health`
 
-### 4.2 前端（骨架）
+### 6.2 Start Frontend
+
 ```bash
-cd frontend
-npm install
-npm run dev
+cd d:\zkw\study\工程实训\frontend
+npm.cmd install
+npm.cmd run dev
 ```
 
-## 5. 核心接口
-- `POST /api/projects/generate` (一键链路：创建->抽取->匹配->校验->渲染->导出)
+Frontend URL:
+- `http://127.0.0.1:3000`
+
+Note (Windows PowerShell):
+- If `npm` script policy is blocked, use `npm.cmd`.
+
+## 7. API Overview
+
+Base URL:
+- `http://127.0.0.1:8000`
+
+Project:
 - `POST /api/projects`
+- `GET /api/projects/{project_id}`
+
+Generation pipeline:
 - `POST /api/projects/{project_id}/extract`
 - `POST /api/projects/{project_id}/clauses/match`
 - `POST /api/projects/{project_id}/validate`
 - `POST /api/projects/{project_id}/render`
 - `POST /api/projects/{project_id}/export`
 
-## 6. 测试
+One-shot generation:
+- `POST /api/projects/generate`
+
+## 8. One-Shot Endpoint Example
+
+Request:
+
+```json
+{
+  "project_name": "Server Procurement Project",
+  "department": "IT Department",
+  "raw_input_text": "Server procurement project, budget 3000000 CNY, delivery in 45 days, payment terms 30/60/10, acceptance by test report, warranty 24 months.",
+  "format": "pdf",
+  "mode": "formal"
+}
+```
+
+Important response fields:
+- `risk_summary`: validation findings
+- `can_export_formal`: whether formal export is allowed
+- `export_blocked`: whether formal export was blocked
+- `delivered_mode`: actual output mode (`formal` or downgraded `draft`)
+- `file_url`: downloadable output file URL
+
+## 9. Export Behavior and Risk Gate
+
+Rules:
+- `draft`: allowed with medium/low risks
+- `formal`: blocked when any high severity risk exists
+
+Special behavior for one-shot endpoint:
+- If user requests `formal` but high risk exists:
+  - API does not fail with 400
+  - API auto-generates a `draft` file
+  - API returns draft download URL and explanatory message
+
+Direct export endpoint behavior:
+- `POST /api/projects/{project_id}/export` with `mode=formal` still returns `400` when blocked (strict mode).
+
+## 10. Data and Persistence
+
+Static data:
+- Clause library: `data/clauses/clauses.json`
+- Template rules: `data/templates/document_template.json`
+- Seed examples: `data/seeds/`
+
+Runtime data:
+- Project snapshots, doc versions, audit logs:
+  - `data/runtime/`
+
+Export files:
+- `exports/`
+
+## 11. Testing
+
+Run all backend tests:
+
 ```bash
+cd d:\zkw\study\工程实训
 pytest backend/tests -q
 ```
 
-包含测试：
-- schema 校验测试
-- 规则引擎测试
-- 模板装配测试
-- 导出测试
-- API 端到端测试
+Covered areas:
+- Extraction/schema validation
+- Rule engine
+- Template rendering
+- Export services
+- API end-to-end flow
 
-## 7. 导出规则
-- `mode=draft`：允许中低风险并添加草稿水印
-- `mode=formal`：仅当 `can_export_formal=true` 才允许
-- 文件命名：`项目名称_文件类型_版本号_日期.docx/pdf`
+## 12. Troubleshooting
 
-## 8. 注意事项
-- 条款和模板不写死在业务逻辑中，全部在 `data/` 下维护。
-- 审计日志、快照、文档版本落盘在 `data/runtime/`。
-- 当前前端为 MVP 骨架页，核心功能由后端 API 驱动。
+### 12.1 `npm` Not Found in PowerShell
+
+Use:
+
+```bash
+npm.cmd install
+npm.cmd run dev
+```
+
+### 12.2 PowerShell `npm.ps1` Execution Policy Error
+
+Temporary workaround:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+### 12.3 Formal Export Blocked
+
+This is expected when high severity risk exists.
+Check these fields in response:
+- `risk_summary`
+- `can_export_formal`
+- `export_blocked`
+- `delivered_mode`
+- `file_url`
+
+### 12.4 PDF Link Exists But You Cannot Open File
+
+Check:
+1. Backend is still running
+2. URL host/port matches your backend instance
+3. File is present in `exports/`
+
+## 13. Related Docs
+
+- `docs/prd.md`: MVP requirement summary
+- `docs/api.md`: API summary
+- `docs/rulebook.md`: validation rule list
+- `plans.md`: milestone plan
+- `implement.md`: implementation runbook
