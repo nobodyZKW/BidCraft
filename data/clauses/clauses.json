@@ -1,0 +1,176 @@
+[
+  {
+    "clause_id": "PAYMENT_30_60_10_V2",
+    "clause_name": "付款条款 30/60/10",
+    "clause_type": "payment",
+    "content_template": "合同签订后支付预付款{{payment_terms}}（按约定拆分），尾款在验收通过后支付。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [
+      "payment_terms",
+      "budget_amount"
+    ],
+    "forbidden_conditions": [
+      "advance_payment_over_50"
+    ],
+    "risk_level": "low",
+    "version": "v2",
+    "effective_date": "2024-01-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": true
+  },
+  {
+    "clause_id": "PAYMENT_20_70_10_V1",
+    "clause_name": "付款条款 20/70/10",
+    "clause_type": "payment",
+    "content_template": "合同签订支付20%，到货验收支付70%，质保期结束支付10%。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [
+      "budget_amount"
+    ],
+    "forbidden_conditions": [],
+    "risk_level": "low",
+    "version": "v1",
+    "effective_date": "2024-01-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": false
+  },
+  {
+    "clause_id": "DELIVERY_ACCEPTANCE_V2",
+    "clause_name": "交付与验收条款",
+    "clause_type": "delivery",
+    "content_template": "供应商应在{{delivery_days}}天内完成交付，按{{acceptance_standard}}执行验收。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [
+      "delivery_days",
+      "acceptance_standard"
+    ],
+    "forbidden_conditions": [],
+    "risk_level": "low",
+    "version": "v2",
+    "effective_date": "2024-06-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": true
+  },
+  {
+    "clause_id": "WARRANTY_V1",
+    "clause_name": "质保条款",
+    "clause_type": "warranty",
+    "content_template": "本项目质保期为{{warranty_months}}个月，质保期内免费维修更换。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [
+      "warranty_months"
+    ],
+    "forbidden_conditions": [],
+    "risk_level": "low",
+    "version": "v1",
+    "effective_date": "2024-01-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": false
+  },
+  {
+    "clause_id": "ACCEPTANCE_V1",
+    "clause_name": "验收标准条款",
+    "clause_type": "acceptance",
+    "content_template": "验收依据：{{acceptance_standard}}。若验收不通过，供应商应在5个工作日内整改。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [
+      "acceptance_standard"
+    ],
+    "forbidden_conditions": [],
+    "risk_level": "low",
+    "version": "v1",
+    "effective_date": "2024-01-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": false
+  },
+  {
+    "clause_id": "LIABILITY_V2",
+    "clause_name": "违约责任条款",
+    "clause_type": "liability",
+    "content_template": "供应商逾期交付，每逾期一天按合同总价0.1%承担违约金，最高不超过合同总价10%。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [],
+    "forbidden_conditions": [],
+    "risk_level": "medium",
+    "version": "v2",
+    "effective_date": "2024-03-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": true
+  },
+  {
+    "clause_id": "DISPUTE_V1",
+    "clause_name": "争议解决条款",
+    "clause_type": "dispute",
+    "content_template": "双方因履行本合同产生争议，应先协商，协商不成提交项目所在地人民法院诉讼解决。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [],
+    "forbidden_conditions": [],
+    "risk_level": "medium",
+    "version": "v1",
+    "effective_date": "2024-01-01",
+    "expiry_date": null,
+    "status": "approved",
+    "locked": true
+  },
+  {
+    "clause_id": "DISPUTE_V0_EXPIRED",
+    "clause_name": "争议解决条款（过期）",
+    "clause_type": "dispute",
+    "content_template": "争议由仲裁委员会处理。",
+    "applicable_procurement_types": [
+      "goods"
+    ],
+    "applicable_methods": [
+      "public_tender"
+    ],
+    "required_fields": [],
+    "forbidden_conditions": [],
+    "risk_level": "medium",
+    "version": "v0",
+    "effective_date": "2023-01-01",
+    "expiry_date": "2024-12-31",
+    "status": "deprecated",
+    "locked": false
+  }
+]

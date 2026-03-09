@@ -1,0 +1,84 @@
+[
+  {
+    "rule_code": "MISSING_BUDGET",
+    "rule_name": "预算必填",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "MISSING_METHOD",
+    "rule_name": "采购方式必填",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "MISSING_PAYMENT_TERMS",
+    "rule_name": "付款条款必填",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "MISSING_ACCEPTANCE_STANDARD",
+    "rule_name": "验收标准必填",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "MISSING_LIABILITY",
+    "rule_name": "违约责任必填",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "MISSING_DISPUTE",
+    "rule_name": "争议解决必填",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "ADVANCE_PAYMENT_OVER_LIMIT",
+    "rule_name": "预付款比例红线",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {
+      "max_advance_payment_percent": 50
+    }
+  },
+  {
+    "rule_code": "CLAUSE_VERSION_EXPIRED",
+    "rule_name": "条款版本有效性",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "UNRESOLVED_PLACEHOLDER",
+    "rule_name": "未替换占位符拦截",
+    "rule_type": "hard",
+    "severity": "high",
+    "enabled": true,
+    "config": {}
+  },
+  {
+    "rule_code": "POTENTIAL_DISCRIMINATION",
+    "rule_name": "资格条件歧视性预警",
+    "rule_type": "semantic",
+    "severity": "medium",
+    "enabled": true,
+    "config": {}
+  }
+]

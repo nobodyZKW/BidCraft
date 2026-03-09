@@ -1,0 +1,7 @@
+config/
+__pycache__/
+.pytest_cache/
+.env
+exports/
+data/runtime/
+frontend/node_modules/
