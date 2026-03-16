@@ -51,3 +51,21 @@ class ClauseService:
                 )
             )
         return selected, sections
+
+    def list_alternatives(
+        self,
+        *,
+        clause_type: str,
+        structured_data: dict,
+    ) -> list[Clause]:
+        return self.clause_repository.get_alternatives(
+            clause_type=clause_type,
+            structured_data=structured_data,
+        )
+
+    def get_by_ids(self, clause_ids: list[str]) -> list[Clause]:
+        return self.clause_repository.get_by_ids(clause_ids)
+
+    def get_by_id(self, clause_id: str) -> Clause | None:
+        clauses = self.clause_repository.get_by_ids([clause_id])
+        return clauses[0] if clauses else None

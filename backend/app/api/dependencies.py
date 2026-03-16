@@ -2,8 +2,12 @@ from __future__ import annotations
 
 from functools import lru_cache
 
+from app.agent.graph import build_agent_graph
+from app.agent.nodes import AgentNodeDependencies
+from app.agent.runtime import AgentWorkflowRunner
 from app.core.settings import settings
 from app.llm.deepseek_client import DeepSeekClient
+from app.repositories.agent_state_repository import AgentStateRepository
 from app.renderers.template_renderer import TemplateRenderer
 from app.repositories.clause_repository import ClauseRepository
 from app.repositories.project_repository import ProjectRepository
@@ -34,4 +38,25 @@ def get_project_service() -> ProjectService:
         template_renderer=template_renderer,
         rule_engine=rule_engine,
         export_service=export_service,
+    )
+
+
+@lru_cache(maxsize=1)
+def get_agent_workflow_runner() -> AgentWorkflowRunner:
+    project_service = get_project_service()
+    deps = AgentNodeDependencies(
+        project_service=project_service,
+        extraction_service=project_service.extraction_service,
+        clause_service=project_service.clause_service,
+        export_service=project_service.export_service,
+        export_guard=project_service.export_guard,
+    )
+    workflow = build_agent_graph(
+        deps=deps,
+        enable_interrupts=False,
+    )
+    state_repository = AgentStateRepository(settings.runtime_dir)
+    return AgentWorkflowRunner(
+        workflow=workflow,
+        state_repository=state_repository,
     )

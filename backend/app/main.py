@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
+from app.api.routes_agent import router_agent
 from app.core.settings import settings
 
 
@@ -35,6 +36,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(router)
+app.include_router(router_agent)
 app.mount("/exports", StaticFiles(directory=settings.export_dir), name="exports")
 
 

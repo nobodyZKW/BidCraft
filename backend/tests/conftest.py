@@ -13,7 +13,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 
-from app.api.dependencies import get_project_service  # noqa: E402
+from app.api.dependencies import get_agent_workflow_runner, get_project_service  # noqa: E402
 from app.core.settings import settings  # noqa: E402
 from app.llm.deepseek_client import DeepSeekClient  # noqa: E402
 
@@ -30,6 +30,7 @@ def _clean_runtime() -> None:
         elif file.is_dir():
             shutil.rmtree(file)
     get_project_service.cache_clear()
+    get_agent_workflow_runner.cache_clear()
     yield
 
 
