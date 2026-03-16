@@ -24,6 +24,7 @@ export type GenerateDocumentResponse = {
   export_blocked: boolean;
   delivered_mode: "draft" | "formal";
   message: string;
+  tool_calls: string[];
 };
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";

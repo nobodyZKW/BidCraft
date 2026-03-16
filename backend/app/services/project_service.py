@@ -338,6 +338,13 @@ class ProjectService:
         created_by: str,
         operator_id: str,
     ) -> dict[str, Any]:
+        tool_calls = [
+            "extraction_tools.py:extract_requirements_tool",
+            "validation_tools.py:validate_document_tool",
+            "render_tools.py:render_preview_tool",
+            "export_tools.py:export_document_tool",
+            "rules/export_guard.py:FormalExportGuard",
+        ]
         project = self.create_project(
             project_name=project_name,
             department=department,
@@ -386,4 +393,5 @@ class ProjectService:
             "export_blocked": export_blocked,
             "delivered_mode": delivered_mode,
             "message": message,
+            "tool_calls": tool_calls,
         }

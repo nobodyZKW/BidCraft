@@ -242,4 +242,5 @@ def generate_document(
         export_blocked=result["export_blocked"],
         delivered_mode=result["delivered_mode"],
         message=result["message"],
+        tool_calls=result.get("tool_calls", []),
     )
