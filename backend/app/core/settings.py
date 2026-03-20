@@ -21,7 +21,13 @@ def _load_repo_api_key() -> str | None:
 
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)  # type: ignore[assignment]
-    return getattr(module, "DEEPSEEK_API_KEY", None) or getattr(module, "API_KEY", None)
+    key = getattr(module, "DEEPSEEK_API_KEY", None)
+    if isinstance(key, str) and key.strip():
+        return key.strip()
+    fallback = getattr(module, "API_KEY", None)
+    if isinstance(fallback, str) and fallback.strip():
+        return fallback.strip()
+    return None
 
 
 @dataclass(frozen=True)
@@ -44,6 +50,11 @@ def _env(name: str, default: Any) -> Any:
 
 def load_settings() -> Settings:
     repo_key = _load_repo_api_key() or ""
+    if not repo_key:
+        raise ValueError(
+            "Missing DEEPSEEK_API_KEY in config/config.py. "
+            "All API key usage is configured to read from this file."
+        )
     data_dir = ROOT_DIR / "data"
     runtime_dir = data_dir / "runtime"
     export_dir = ROOT_DIR / "exports"
@@ -54,7 +65,7 @@ def load_settings() -> Settings:
     return Settings(
         app_name="BidCraft AI",
         app_version="1.0.0-mvp",
-        deepseek_api_key=str(_env("DEEPSEEK_API_KEY", repo_key)),
+        deepseek_api_key=repo_key,
         deepseek_base_url=str(_env("DEEPSEEK_BASE_URL", "https://api.deepseek.com")),
         deepseek_model=str(_env("DEEPSEEK_MODEL", "deepseek-chat")),
         data_dir=data_dir,

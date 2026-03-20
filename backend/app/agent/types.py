@@ -246,6 +246,24 @@ class SuggestFixPlanResult(ToolOutputBase):
     can_downgrade_to_draft: bool = True
 
 
+class AutoRepairWithPeToolInput(ToolInputBase):
+    """Input for one-shot PE risk repair action."""
+
+    raw_input_text: str = ""
+    structured_data: dict[str, Any] = Field(default_factory=dict)
+    selected_clause_ids: list[str] = Field(default_factory=list)
+    risk_summary: list[RiskItem] = Field(default_factory=list)
+
+
+class AutoRepairWithPeToolResult(ToolOutputBase):
+    """Output for one-shot PE risk repair action."""
+
+    structured_data: dict[str, Any] = Field(default_factory=dict)
+    selected_clause_ids: list[str] = Field(default_factory=list)
+    applied_actions: list[str] = Field(default_factory=list)
+    used_llm: bool = False
+
+
 class CheckFormalExportEligibilityToolInput(ToolInputBase):
     """Input for formal export guard checks."""
 
@@ -288,6 +306,29 @@ class UserOptionsToolResult(ToolOutputBase):
     requires_user_input: bool = False
     prompt: str = ""
     options: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ClarificationReviewToolInput(ToolInputBase):
+    """Input for clarification review before merge."""
+
+    messages: list[AgentMessage] = Field(default_factory=list)
+    raw_input_text: str = ""
+    structured_data: dict[str, Any] = Field(default_factory=dict)
+    missing_fields: list[str] = Field(default_factory=list)
+    clarification_questions: list[str] = Field(default_factory=list)
+    user_clarifications: dict[str, Any] = Field(default_factory=dict)
+
+
+class ClarificationReviewToolResult(ToolOutputBase):
+    """Output for clarification review before merge."""
+
+    accepted: bool = False
+    confidence: float = 0.0
+    normalized_clarifications: dict[str, Any] = Field(default_factory=dict)
+    errors: list[str] = Field(default_factory=list)
+    follow_up_questions: list[dict[str, str]] = Field(default_factory=list)
+    reasoning: list[str] = Field(default_factory=list)
+    used_llm: bool = False
 
 
 class RequestHumanConfirmationToolInput(ToolInputBase):

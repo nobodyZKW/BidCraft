@@ -54,6 +54,27 @@ class DeepSeekClient:
         raw_input_text: str,
         schema: dict[str, Any],
     ) -> dict[str, Any] | None:
+        task_prompt = (
+            "Task A: Extract procurement requirements.\n"
+            "Task B: Fill missing_fields and clarification_questions.\n"
+            f"Raw requirement text:\n{raw_input_text}\n"
+        )
+        return self.generate_structured_json(
+            task_prompt=task_prompt,
+            schema=schema,
+            system_prompt=(
+                "You are a procurement analyst. Return JSON only, no markdown. "
+                "Output must strictly conform to provided JSON schema."
+            ),
+        )
+
+    def generate_structured_json(
+        self,
+        *,
+        task_prompt: str,
+        schema: dict[str, Any],
+        system_prompt: str,
+    ) -> dict[str, Any] | None:
         if not self.api_key:
             return None
 
@@ -61,18 +82,14 @@ class DeepSeekClient:
         messages = [
             {
                 "role": "system",
-                "content": (
-                    "You are a procurement analyst. Return JSON only, no markdown. "
-                    "Output must strictly conform to provided JSON schema."
-                ),
+                "content": system_prompt,
             },
             {
                 "role": "user",
                 "content": (
-                    "Task A: Extract procurement requirements.\n"
-                    "Task B: Fill missing_fields and clarification_questions.\n"
+                    "Return valid JSON only.\n"
                     f"JSON schema:\n{schema_str}\n"
-                    f"Raw requirement text:\n{raw_input_text}\n"
+                    f"Task:\n{task_prompt}\n"
                 ),
             },
         ]

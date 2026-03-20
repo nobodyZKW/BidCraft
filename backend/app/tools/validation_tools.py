@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from app.agent.types import (
+    AutoRepairWithPeToolInput,
+    AutoRepairWithPeToolResult,
     CheckFormalExportEligibilityToolInput,
     ExplainRiskSummaryToolInput,
     FormalExportEligibilityResult,
@@ -15,6 +17,7 @@ from app.renderers.template_renderer import TemplateRenderer
 from app.rules.export_guard import FormalExportGuard
 from app.rules.rule_engine import RuleEngine
 from app.services.clause_service import ClauseService
+from app.services.risk_repair_service import RiskRepairService
 from app.tools.exceptions import raise_tool_error
 
 
@@ -150,4 +153,33 @@ def check_formal_export_eligibility_tool(
         )
     except Exception as exc:  # pragma: no cover - normalized below
         raise_tool_error(exc, context="check_formal_export_eligibility_tool")
+        raise
+
+
+def auto_repair_with_pe_tool(
+    tool_input: AutoRepairWithPeToolInput,
+    *,
+    repair_service: RiskRepairService,
+    clause_service: ClauseService,
+) -> AutoRepairWithPeToolResult:
+    """Apply a one-shot PE repair plan (single API call + deterministic fallback)."""
+
+    try:
+        applied = repair_service.apply_repair(
+            raw_input_text=tool_input.raw_input_text,
+            structured_data=tool_input.structured_data,
+            selected_clause_ids=tool_input.selected_clause_ids,
+            risk_summary=tool_input.risk_summary,
+            clause_service=clause_service,
+        )
+        return AutoRepairWithPeToolResult(
+            structured_data=applied.structured_data,
+            selected_clause_ids=applied.selected_clause_ids,
+            applied_actions=applied.applied_actions,
+            used_llm=applied.used_llm,
+            message="pe repair applied",
+            trace=["validation.auto_repair_with_pe"],
+        )
+    except Exception as exc:  # pragma: no cover - normalized below
+        raise_tool_error(exc, context="auto_repair_with_pe_tool")
         raise

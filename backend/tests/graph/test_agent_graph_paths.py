@@ -4,6 +4,9 @@ from app.agent.graph import build_agent_graph
 from app.agent.nodes import AgentNodeDependencies
 from app.agent.state import create_initial_state
 from app.api.dependencies import get_project_service
+from app.llm.deepseek_client import DeepSeekClient
+from app.services.clarification_review_service import ClarificationReviewService
+from app.services.risk_repair_service import RiskRepairService
 from app.tools.clause_tools import list_clause_alternatives_tool
 from app.agent.types import ListClauseAlternativesToolInput
 
@@ -13,9 +16,11 @@ def _deps() -> AgentNodeDependencies:
     return AgentNodeDependencies(
         project_service=service,
         extraction_service=service.extraction_service,
+        clarification_review_service=ClarificationReviewService(DeepSeekClient()),
         clause_service=service.clause_service,
         export_service=service.export_service,
         export_guard=service.export_guard,
+        risk_repair_service=RiskRepairService(DeepSeekClient()),
     )
 
 
@@ -111,3 +116,41 @@ def test_graph_override_payment_clause_branch() -> None:
     assert result["user_intent"] == "override_payment_clause"
     assert override_id in result["selected_clause_ids"]
     assert result["validation_result"]
+
+
+def test_graph_auto_repair_with_pe_branch() -> None:
+    graph = _workflow()
+    state = create_initial_state(
+        session_id="graph_auto_repair",
+        raw_input_text="Please auto repair risks with one API call.",
+    )
+    structured = _structured_data()
+    structured["payment_terms"] = ""
+    state["structured_data"] = structured
+    state["missing_fields"] = []
+    state["clarification_questions"] = []
+    state["user_clarifications"] = {"auto_repair_with_pe": True}
+
+    result = graph.invoke(state)
+    assert "validation_tools.auto_repair_with_pe" in result["tool_calls"]
+    assert result["structured_data"]["payment_terms"]
+
+
+def test_graph_clarification_review_rejects_and_reasks() -> None:
+    graph = _workflow()
+    state = create_initial_state(
+        session_id="graph_clarification_reject",
+        raw_input_text="Continue workflow.",
+    )
+    structured = _structured_data()
+    structured["payment_terms"] = ""
+    structured["missing_fields"] = ["payment_terms"]
+    structured["clarification_questions"] = ["Please provide payment terms."]
+    state["structured_data"] = structured
+    state["missing_fields"] = ["payment_terms"]
+    state["clarification_questions"] = ["Please provide payment terms."]
+    state["user_clarifications"] = {"payment_terms": "maybe later"}
+
+    result = graph.invoke(state)
+    assert result["pending_human_confirmation"] is True
+    assert "clarification_tools.review_clarification.reject" in result["tool_calls"]

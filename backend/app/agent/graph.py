@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.nodes import (
     AgentNodeDependencies,
+    auto_repair_with_pe,
     ask_for_clarification,
     build_fix_options,
     confirm_export,
@@ -31,6 +32,10 @@ def _route_after_ensure_project(state: AgentGraphState) -> str:
 
 def _route_after_decide_clarification(state: AgentGraphState) -> str:
     return state.get("next_action", "respond")
+
+
+def _route_after_merge_clarification(state: AgentGraphState) -> str:
+    return state.get("next_action", "decide_need_clarification")
 
 
 def _route_after_decide_repair(state: AgentGraphState) -> str:
@@ -64,10 +69,11 @@ def build_agent_graph(
     graph.add_node("extract_requirements", partial(extract_requirements, deps=deps))
     graph.add_node("decide_need_clarification", decide_need_clarification)
     graph.add_node("ask_for_clarification", ask_for_clarification)
-    graph.add_node("merge_clarifications", merge_clarifications)
+    graph.add_node("merge_clarifications", partial(merge_clarifications, deps=deps))
     graph.add_node("match_clauses", partial(match_clauses, deps=deps))
     graph.add_node("validate_document", partial(validate_document, deps=deps))
     graph.add_node("decide_repair_or_continue", decide_repair_or_continue)
+    graph.add_node("auto_repair_with_pe", partial(auto_repair_with_pe, deps=deps))
     graph.add_node("build_fix_options", build_fix_options)
     graph.add_node("render_preview", partial(render_preview, deps=deps))
     graph.add_node("confirm_export", confirm_export)
@@ -98,7 +104,15 @@ def build_agent_graph(
         },
     )
     graph.add_edge("ask_for_clarification", "respond")
-    graph.add_edge("merge_clarifications", "decide_need_clarification")
+    graph.add_conditional_edges(
+        "merge_clarifications",
+        _route_after_merge_clarification,
+        {
+            "decide_need_clarification": "decide_need_clarification",
+            "ask_for_clarification": "ask_for_clarification",
+            "respond": "respond",
+        },
+    )
 
     graph.add_edge("match_clauses", "validate_document")
     graph.add_edge("validate_document", "decide_repair_or_continue")
@@ -106,11 +120,13 @@ def build_agent_graph(
         "decide_repair_or_continue",
         _route_after_decide_repair,
         {
+            "auto_repair_with_pe": "auto_repair_with_pe",
             "build_fix_options": "build_fix_options",
             "render_preview": "render_preview",
             "respond": "respond",
         },
     )
+    graph.add_edge("auto_repair_with_pe", "match_clauses")
     graph.add_edge("build_fix_options", "respond")
 
     graph.add_conditional_edges(

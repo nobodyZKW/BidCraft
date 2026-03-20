@@ -12,9 +12,11 @@ from app.agent.prompts import (
 from app.agent.state import AgentGraphState
 from app.agent.types import (
     AgentMessage,
+    AutoRepairWithPeToolInput,
     BuildUserOptionsToolInput,
     CheckFormalExportEligibilityToolInput,
     CheckMissingFieldsToolInput,
+    ClarificationReviewToolInput,
     CreateProjectToolInput,
     ExportDocumentToolInput,
     ExtractRequirementsToolInput,
@@ -33,11 +35,14 @@ from app.agent.types import (
 )
 from app.rules.export_guard import FormalExportGuard
 from app.services.clause_service import ClauseService
+from app.services.clarification_review_service import ClarificationReviewService
 from app.services.export_service import ExportService
 from app.services.extraction_service import ExtractionService
 from app.services.project_service import ProjectService
+from app.services.risk_repair_service import RiskRepairService
 from app.tools.clarification_tools import (
     build_user_options_tool,
+    review_clarification_tool,
     request_human_confirmation_tool,
 )
 from app.tools.clause_tools import (
@@ -60,6 +65,7 @@ from app.tools.project_tools import (
 )
 from app.tools.render_tools import render_preview_tool
 from app.tools.validation_tools import (
+    auto_repair_with_pe_tool,
     check_formal_export_eligibility_tool,
     suggest_fix_plan_tool,
     validate_document_tool,
@@ -70,6 +76,7 @@ CONTROL_CLARIFICATION_KEYS = {
     "allow_draft",
     "confirmed_export",
     "override_clause_id",
+    "auto_repair_with_pe",
 }
 
 
@@ -79,9 +86,11 @@ class AgentNodeDependencies:
 
     project_service: ProjectService
     extraction_service: ExtractionService
+    clarification_review_service: ClarificationReviewService
     clause_service: ClauseService
     export_service: ExportService
     export_guard: FormalExportGuard
+    risk_repair_service: RiskRepairService
 
 
 def _messages_from_state(state: AgentGraphState) -> list[AgentMessage]:
@@ -125,7 +134,7 @@ def _extract_text_for_intent(state: AgentGraphState) -> str:
 
 def _infer_intent(text: str) -> str:
     lowered = text.lower()
-    if any(token in lowered for token in ["missing", "缺失", "缺字段", "clarification"]):
+    if any(token in lowered for token in ["missing", "缺失", "缺字段"]):
         return "view_missing_fields"
     if (
         ("payment" in lowered or "付款" in text)
@@ -178,6 +187,10 @@ def _control_confirmed_export(state: AgentGraphState) -> bool | None:
     return bool(value)
 
 
+def _control_auto_repair_with_pe(state: AgentGraphState) -> bool:
+    return bool(state.get("user_clarifications", {}).get("auto_repair_with_pe"))
+
+
 def understand_intent(state: AgentGraphState) -> AgentGraphState:
     """Determine user intent from the request text."""
 
@@ -185,6 +198,7 @@ def understand_intent(state: AgentGraphState) -> AgentGraphState:
     intent = _infer_intent(text)
     return AgentGraphState(
         user_intent=intent,
+        error=None,
         current_step="understand_intent",
         next_action="ensure_project",
         messages=_append_message(state, role="user", content=text or "continue"),
@@ -357,34 +371,118 @@ def ask_for_clarification(state: AgentGraphState) -> AgentGraphState:
         return _tool_failure(state, marker="ask_for_clarification", exc=exc)
 
 
-def merge_clarifications(state: AgentGraphState) -> AgentGraphState:
+def merge_clarifications(
+    state: AgentGraphState,
+    deps: AgentNodeDependencies,
+) -> AgentGraphState:
     """Merge user-supplied clarification values into structured payload."""
 
     try:
+        control_payload = {
+            key: value
+            for key, value in state.get("user_clarifications", {}).items()
+            if key in CONTROL_CLARIFICATION_KEYS
+        }
         payload = {
             key: value
             for key, value in state.get("user_clarifications", {}).items()
             if key not in CONTROL_CLARIFICATION_KEYS
         }
+        review_result = review_clarification_tool(
+            ClarificationReviewToolInput(
+                session_id=state.get("session_id"),
+                project_id=state.get("project_id"),
+                operator_id="agent",
+                messages=_messages_from_state(state),
+                raw_input_text=state.get("raw_input_text", ""),
+                structured_data=state.get("structured_data", {}),
+                missing_fields=state.get("missing_fields", []),
+                clarification_questions=state.get("clarification_questions", []),
+                user_clarifications=payload,
+            ),
+            review_service=deps.clarification_review_service,
+        )
+        if not review_result.accepted:
+            follow_up_by_field: dict[str, str] = {}
+            for item in review_result.follow_up_questions:
+                field = ""
+                question = ""
+                if isinstance(item, dict):
+                    field = str(item.get("field", "")).strip()
+                    question = str(item.get("question", "")).strip()
+                elif isinstance(item, list) and len(item) >= 2:
+                    field = str(item[0]).strip()
+                    question = str(item[1]).strip()
+                if field:
+                    follow_up_by_field[field] = question
+            next_questions = [
+                follow_up_by_field.get(field) or question
+                for field, question in zip(
+                    state.get("missing_fields", []),
+                    state.get("clarification_questions", []),
+                )
+            ]
+            while len(next_questions) < len(state.get("missing_fields", [])):
+                field = state.get("missing_fields", [])[len(next_questions)]
+                next_questions.append(
+                    follow_up_by_field.get(field)
+                    or f"Please clarify field: {field}"
+                )
+            options_result = build_user_options_tool(
+                BuildUserOptionsToolInput(
+                    session_id=state.get("session_id"),
+                    project_id=state.get("project_id"),
+                    operator_id="agent",
+                    missing_fields=state.get("missing_fields", []),
+                    clarification_questions=next_questions,
+                )
+            )
+            error_text = "; ".join(review_result.errors) or "Clarification review rejected."
+            return AgentGraphState(
+                user_clarifications=control_payload,
+                pending_human_confirmation=True,
+                options=options_result.options,
+                current_step="ask_for_clarification",
+                next_action="respond",
+                trace=_append_trace(state, "node.merge_clarifications.review_rejected"),
+                messages=_append_message(
+                    state,
+                    role="assistant",
+                    content=(
+                        "Clarification review failed. Please fix and resubmit. "
+                        f"Reason: {error_text}"
+                    ),
+                ),
+                tool_calls=_append_tool_call(
+                    state, "clarification_tools.review_clarification.reject"
+                ),
+            )
+
+        reviewed_payload = {**payload, **review_result.normalized_clarifications}
         merge_result = merge_clarifications_tool(
             MergeClarificationsToolInput(
                 session_id=state.get("session_id"),
                 project_id=state.get("project_id"),
                 operator_id="agent",
                 structured_data=state.get("structured_data", {}),
-                user_clarifications=payload,
+                user_clarifications=reviewed_payload,
             )
         )
         return AgentGraphState(
             structured_data=merge_result.structured_data,
             missing_fields=merge_result.missing_fields,
             clarification_questions=merge_result.clarification_questions,
+            user_clarifications=control_payload,
             pending_human_confirmation=False,
             options=[],
             current_step="merge_clarifications",
             next_action="decide_need_clarification",
             trace=_append_trace(state, "node.merge_clarifications"),
-            tool_calls=_append_tool_call(state, "extraction_tools.merge_clarifications"),
+            tool_calls=[
+                *state.get("tool_calls", []),
+                "clarification_tools.review_clarification.accept",
+                "extraction_tools.merge_clarifications",
+            ],
         )
     except Exception as exc:
         return _tool_failure(state, marker="merge_clarifications", exc=exc)
@@ -510,10 +608,13 @@ def decide_repair_or_continue(state: AgentGraphState) -> AgentGraphState:
     intent = state.get("user_intent", "generate_document")
     can_export_formal = bool(state.get("can_export_formal", False))
     allow_draft = _control_allow_draft(state)
+    auto_repair = _control_auto_repair_with_pe(state)
     if intent == "override_payment_clause":
         next_action = "respond"
     elif not can_export_formal:
-        if intent == "draft_export" or allow_draft:
+        if auto_repair:
+            next_action = "auto_repair_with_pe"
+        elif intent == "draft_export" or allow_draft:
             next_action = "render_preview"
         else:
             next_action = "build_fix_options"
@@ -527,6 +628,53 @@ def decide_repair_or_continue(state: AgentGraphState) -> AgentGraphState:
         next_action=next_action,
         trace=_append_trace(state, "node.decide_repair_or_continue"),
     )
+
+
+def auto_repair_with_pe(
+    state: AgentGraphState,
+    deps: AgentNodeDependencies,
+) -> AgentGraphState:
+    """Run one-shot PE repair plan and feed patched payload back into matching/validation."""
+
+    try:
+        validation_result = ValidationToolResult.model_validate(state.get("validation_result", {}))
+        repaired = auto_repair_with_pe_tool(
+            AutoRepairWithPeToolInput(
+                session_id=state.get("session_id"),
+                project_id=state.get("project_id"),
+                operator_id="agent",
+                raw_input_text=state.get("raw_input_text", ""),
+                structured_data=state.get("structured_data", {}),
+                selected_clause_ids=state.get("selected_clause_ids", []),
+                risk_summary=validation_result.risk_summary,
+            ),
+            repair_service=deps.risk_repair_service,
+            clause_service=deps.clause_service,
+        )
+        user_clarifications = dict(state.get("user_clarifications", {}))
+        user_clarifications["auto_repair_with_pe"] = False
+        summary = (
+            "PE repair applied via API key once."
+            if repaired.used_llm
+            else "PE repair fallback applied (no API response)."
+        )
+        detail = "; ".join(repaired.applied_actions[:3])
+        if detail:
+            summary = f"{summary} {detail}"
+        return AgentGraphState(
+            structured_data=repaired.structured_data,
+            selected_clause_ids=repaired.selected_clause_ids,
+            user_clarifications=user_clarifications,
+            pending_human_confirmation=False,
+            options=[],
+            current_step="auto_repair_with_pe",
+            next_action="match_clauses",
+            trace=_append_trace(state, "node.auto_repair_with_pe"),
+            messages=_append_message(state, role="assistant", content=summary),
+            tool_calls=_append_tool_call(state, "validation_tools.auto_repair_with_pe"),
+        )
+    except Exception as exc:
+        return _tool_failure(state, marker="auto_repair_with_pe", exc=exc)
 
 
 def build_fix_options(state: AgentGraphState) -> AgentGraphState:
@@ -543,7 +691,11 @@ def build_fix_options(state: AgentGraphState) -> AgentGraphState:
                 missing_fields=state.get("missing_fields", []),
             )
         )
-        options = [{"id": idx + 1, "text": step} for idx, step in enumerate(plan.fix_steps)]
+        options = [
+            {"id": "auto_repair_with_pe", "text": "PE自动修复一次（调用一次API Key）"},
+            {"id": "allow_draft", "text": "允许降级草稿继续导出"},
+        ]
+        options.extend({"id": idx + 1, "text": step} for idx, step in enumerate(plan.fix_steps))
         confirmation = request_human_confirmation_tool(
             RequestHumanConfirmationToolInput(
                 session_id=state.get("session_id"),

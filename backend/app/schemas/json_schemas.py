@@ -53,3 +53,94 @@ EXTRACTION_SCHEMA = {
     ],
     "additionalProperties": False,
 }
+
+
+RISK_REPAIR_PLAN_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "structured_patch": {
+            "type": "object",
+            "properties": {
+                "budget_amount": {"type": "number", "minimum": 0},
+                "method": {"type": "string", "enum": ["public_tender"]},
+                "payment_terms": {"type": "string"},
+                "acceptance_standard": {"type": "string"},
+                "delivery_days": {"type": "integer", "minimum": 0},
+                "warranty_months": {"type": "integer", "minimum": 0},
+                "delivery_batches": {"type": "integer", "minimum": 1},
+                "evaluation_method": {"type": "string"},
+            },
+            "additionalProperties": False,
+        },
+        "enforce_clause_types": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "enum": ["liability", "dispute", "payment", "acceptance"],
+            },
+            "uniqueItems": True,
+        },
+        "reset_clause_overrides": {"type": "boolean"},
+        "notes": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": [
+        "structured_patch",
+        "enforce_clause_types",
+        "reset_clause_overrides",
+        "notes",
+    ],
+    "additionalProperties": False,
+}
+
+
+CLARIFICATION_REVIEW_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "accepted": {"type": "boolean"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "normalized_clarifications": {
+            "type": "object",
+            "properties": {
+                "project_name": {"type": "string"},
+                "budget_amount": {"type": "number", "minimum": 0},
+                "payment_terms": {"type": "string"},
+                "acceptance_standard": {"type": "string"},
+                "delivery_days": {"type": "integer", "minimum": 0},
+                "warranty_months": {"type": "integer", "minimum": 0},
+            },
+            "additionalProperties": False,
+        },
+        "errors": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "follow_up_questions": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "field": {"type": "string"},
+                    "question": {"type": "string"},
+                },
+                "required": ["field", "question"],
+                "additionalProperties": False,
+            },
+        },
+        "reasoning": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+    },
+    "required": [
+        "accepted",
+        "confidence",
+        "normalized_clarifications",
+        "errors",
+        "follow_up_questions",
+        "reasoning",
+    ],
+    "additionalProperties": False,
+}

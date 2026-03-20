@@ -17,6 +17,8 @@ from app.services.clause_service import ClauseService
 from app.services.export_service import ExportService
 from app.services.extraction_service import ExtractionService
 from app.services.project_service import ProjectService
+from app.services.risk_repair_service import RiskRepairService
+from app.services.clarification_review_service import ClarificationReviewService
 
 
 @lru_cache(maxsize=1)
@@ -44,12 +46,16 @@ def get_project_service() -> ProjectService:
 @lru_cache(maxsize=1)
 def get_agent_workflow_runner() -> AgentWorkflowRunner:
     project_service = get_project_service()
+    risk_repair_service = RiskRepairService(DeepSeekClient())
+    clarification_review_service = ClarificationReviewService(DeepSeekClient())
     deps = AgentNodeDependencies(
         project_service=project_service,
         extraction_service=project_service.extraction_service,
+        clarification_review_service=clarification_review_service,
         clause_service=project_service.clause_service,
         export_service=project_service.export_service,
         export_guard=project_service.export_guard,
+        risk_repair_service=risk_repair_service,
     )
     workflow = build_agent_graph(
         deps=deps,
