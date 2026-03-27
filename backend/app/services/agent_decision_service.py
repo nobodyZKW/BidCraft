@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -104,7 +105,7 @@ class AgentDecisionService:
             else:
                 next_action = "build_fix_options"
         else:
-            if intent in {"formal_export", "draft_export", "generate_document"}:
+            if intent in {"formal_export", "draft_export", "generate_document", "edit_document"}:
                 next_action = "render_preview"
             else:
                 next_action = "respond"
@@ -116,6 +117,19 @@ class AgentDecisionService:
         )
 
     def decide_intent(self, *, text: str) -> IntentDecisionResult:
+        if (
+            any(token in text for token in ["修改", "改为", "改成", "变更", "更新"])
+            or re.search(
+                r"(project_name|budget_amount|payment_terms|acceptance_standard|delivery_days|warranty_months)\s*[:=：]",
+                text,
+            )
+        ):
+            return IntentDecisionResult(
+                intent="edit_document",
+                confidence=0.85,
+                reason="edit_intent_fast_path",
+                used_llm=False,
+            )
         payload = self.llm_client.invoke_structured(
             StructuredLLMRequest(
                 task_name="agent.decide_intent",

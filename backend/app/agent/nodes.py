@@ -41,6 +41,7 @@ from app.services.export_service import ExportService
 from app.services.extraction_service import ExtractionService
 from app.services.project_service import ProjectService
 from app.services.risk_repair_service import RiskRepairService
+from app.services.document_edit_service import DocumentEditService
 from app.tools.clarification_tools import (
     build_user_options_tool,
     review_clarification_tool,
@@ -93,6 +94,7 @@ class AgentNodeDependencies:
     export_guard: FormalExportGuard
     risk_repair_service: RiskRepairService
     agent_decision_service: AgentDecisionService
+    document_edit_service: DocumentEditService
 
 
 def _messages_from_state(state: AgentGraphState) -> list[AgentMessage]:
@@ -272,6 +274,12 @@ def ensure_project(
                     next_action = "extract_requirements"
                 else:
                     next_action = "respond"
+        if (
+            state.get("user_intent") == "edit_document"
+            and structured_data
+            and state.get("raw_input_text")
+        ):
+            next_action = "apply_document_edits"
 
         return AgentGraphState(
             project_id=project_id,
@@ -322,6 +330,64 @@ def extract_requirements(
         )
     except Exception as exc:
         return _tool_failure(state, marker="extract_requirements", exc=exc)
+
+
+def apply_document_edits(
+    state: AgentGraphState,
+    deps: AgentNodeDependencies,
+) -> AgentGraphState:
+    """Apply natural-language edits onto existing structured data."""
+
+    try:
+        edit_result = deps.document_edit_service.apply_edits(
+            text=state.get("raw_input_text", ""),
+            structured_data=state.get("structured_data", {}),
+        )
+        if not edit_result.updated_fields:
+            return AgentGraphState(
+                current_step="apply_document_edits",
+                next_action="respond",
+                trace=_append_trace(state, "node.apply_document_edits.noop"),
+                messages=_append_message(
+                    state,
+                    role="assistant",
+                    content=(
+                        "I could not identify editable fields from your request. "
+                        "Please specify a concrete field change such as project_name=... "
+                        "or say 项目名称改为……"
+                    ),
+                ),
+                tool_calls=_append_tool_call(state, "editing_tools.apply_document_edits.noop"),
+            )
+
+        checked = check_missing_fields_tool(
+            CheckMissingFieldsToolInput(
+                session_id=state.get("session_id"),
+                project_id=state.get("project_id"),
+                operator_id="agent",
+                structured_data=edit_result.structured_data,
+            )
+        )
+        return AgentGraphState(
+            structured_data=checked.structured_data,
+            missing_fields=checked.missing_fields,
+            clarification_questions=checked.clarification_questions,
+            preview_html="",
+            rendered_content="",
+            file_path="",
+            pending_human_confirmation=False,
+            current_step="apply_document_edits",
+            next_action="decide_need_clarification",
+            trace=_append_trace(state, "node.apply_document_edits"),
+            messages=_append_message(
+                state,
+                role="assistant",
+                content=f"Applied updates to: {', '.join(edit_result.updated_fields)}.",
+            ),
+            tool_calls=_append_tool_call(state, "editing_tools.apply_document_edits"),
+        )
+    except Exception as exc:
+        return _tool_failure(state, marker="apply_document_edits", exc=exc)
 
 
 def decide_need_clarification(

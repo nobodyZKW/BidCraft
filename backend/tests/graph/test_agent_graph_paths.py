@@ -7,6 +7,7 @@ from app.api.dependencies import get_project_service
 from app.llm.deepseek_client import DeepSeekClient
 from app.services.agent_decision_service import AgentDecisionService
 from app.services.clarification_review_service import ClarificationReviewService
+from app.services.document_edit_service import DocumentEditService
 from app.services.risk_repair_service import RiskRepairService
 from app.tools.clause_tools import list_clause_alternatives_tool
 from app.agent.types import ListClauseAlternativesToolInput
@@ -23,6 +24,7 @@ def _deps() -> AgentNodeDependencies:
         export_guard=service.export_guard,
         risk_repair_service=RiskRepairService(DeepSeekClient()),
         agent_decision_service=AgentDecisionService(DeepSeekClient()),
+        document_edit_service=DocumentEditService(),
     )
 
 
@@ -156,3 +158,20 @@ def test_graph_clarification_review_rejects_and_reasks() -> None:
     result = graph.invoke(state)
     assert result["pending_human_confirmation"] is True
     assert "clarification_tools.review_clarification.reject" in result["tool_calls"]
+
+
+def test_graph_edit_document_updates_existing_structured_data() -> None:
+    graph = _workflow()
+    state = create_initial_state(
+        session_id="graph_edit_document",
+        raw_input_text="帮我把项目名称改为xxxx测试",
+    )
+    state["structured_data"] = _structured_data()
+    state["missing_fields"] = []
+    state["clarification_questions"] = []
+
+    result = graph.invoke(state)
+
+    assert result["user_intent"] == "edit_document"
+    assert result["structured_data"]["project_name"] == "xxxx测试"
+    assert "editing_tools.apply_document_edits" in result["tool_calls"]

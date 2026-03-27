@@ -153,6 +153,7 @@ INTENT_DECISION_SCHEMA = {
             "type": "string",
             "enum": [
                 "view_missing_fields",
+                "edit_document",
                 "override_payment_clause",
                 "formal_export",
                 "draft_export",

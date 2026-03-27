@@ -40,6 +40,15 @@ def test_decide_intent_falls_back_when_llm_missing() -> None:
     assert result.used_llm is False
 
 
+def test_decide_intent_fast_path_detects_edit_document() -> None:
+    service = AgentDecisionService(StubLLMClient(None))
+
+    result = service.decide_intent(text="帮我把项目名称改为xxxx测试")
+
+    assert result.intent == "edit_document"
+    assert result.used_llm is False
+
+
 def test_decide_clarification_rejects_invalid_llm_action_and_falls_back() -> None:
     service = AgentDecisionService(
         StubLLMClient(

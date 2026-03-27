@@ -7,6 +7,7 @@ from langgraph.graph import END, START, StateGraph
 
 from app.agent.nodes import (
     AgentNodeDependencies,
+    apply_document_edits,
     auto_repair_with_pe,
     ask_for_clarification,
     build_fix_options,
@@ -67,6 +68,7 @@ def build_agent_graph(
     graph.add_node("understand_intent", partial(understand_intent, deps=deps))
     graph.add_node("ensure_project", partial(ensure_project, deps=deps))
     graph.add_node("extract_requirements", partial(extract_requirements, deps=deps))
+    graph.add_node("apply_document_edits", partial(apply_document_edits, deps=deps))
     graph.add_node("decide_need_clarification", partial(decide_need_clarification, deps=deps))
     graph.add_node("ask_for_clarification", ask_for_clarification)
     graph.add_node("merge_clarifications", partial(merge_clarifications, deps=deps))
@@ -88,11 +90,13 @@ def build_agent_graph(
         _route_after_ensure_project,
         {
             "extract_requirements": "extract_requirements",
+            "apply_document_edits": "apply_document_edits",
             "decide_need_clarification": "decide_need_clarification",
             "respond": "respond",
         },
     )
     graph.add_edge("extract_requirements", "decide_need_clarification")
+    graph.add_edge("apply_document_edits", "decide_need_clarification")
     graph.add_conditional_edges(
         "decide_need_clarification",
         _route_after_decide_clarification,

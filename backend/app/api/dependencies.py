@@ -23,6 +23,7 @@ from app.services.knowledge_retrieval_service import KnowledgeRetrievalService
 from app.services.project_service import ProjectService
 from app.services.risk_repair_service import RiskRepairService
 from app.services.clarification_review_service import ClarificationReviewService
+from app.services.document_edit_service import DocumentEditService
 from app.services.evaluation_service import EvaluationService
 from app.retrieval.types import KnowledgeDocument
 
@@ -104,6 +105,7 @@ def get_agent_workflow_runner() -> AgentWorkflowRunner:
     risk_repair_service = RiskRepairService(get_llm_client())
     clarification_review_service = ClarificationReviewService(get_llm_client())
     agent_decision_service = AgentDecisionService(get_llm_client())
+    document_edit_service = DocumentEditService()
     deps = AgentNodeDependencies(
         project_service=project_service,
         extraction_service=project_service.extraction_service,
@@ -113,6 +115,7 @@ def get_agent_workflow_runner() -> AgentWorkflowRunner:
         export_guard=project_service.export_guard,
         risk_repair_service=risk_repair_service,
         agent_decision_service=agent_decision_service,
+        document_edit_service=document_edit_service,
     )
     workflow = build_agent_graph(
         deps=deps,
