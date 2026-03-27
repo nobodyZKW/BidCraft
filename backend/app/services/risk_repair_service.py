@@ -6,8 +6,9 @@ from typing import Any
 
 from jsonschema import ValidationError, validate
 
+from app.agent.prompts import RISK_REPAIR_SYSTEM_PROMPT, RISK_REPAIR_TASK_TEMPLATE
 from app.core.settings import settings
-from app.llm.deepseek_client import DeepSeekClient
+from app.llm.types import StructuredLLMClient, StructuredLLMRequest
 from app.models.domain import Clause, RiskItem
 from app.schemas.json_schemas import RISK_REPAIR_PLAN_SCHEMA
 from app.services.clause_service import ClauseService
@@ -24,7 +25,7 @@ class RiskRepairApplyResult:
 class RiskRepairService:
     """Generate and apply one-shot PE repair plans for high-risk issues."""
 
-    def __init__(self, llm_client: DeepSeekClient):
+    def __init__(self, llm_client: StructuredLLMClient):
         self.llm_client = llm_client
 
     @staticmethod
@@ -121,21 +122,17 @@ class RiskRepairService:
             }
             for item in risk_summary
         ]
-        task_prompt = (
-            "Generate one repair plan for procurement structured fields and clause enforcement.\n"
-            f"Current structured_data: {structured_data}\n"
-            f"Risk summary: {risk_payload}\n"
-            "Return only fields in schema. Do not invent unsupported procurement methods.\n"
-            "For goods + public_tender MVP, prefer compliant defaults and minimal edits.\n"
-        )
-
-        llm_plan = self.llm_client.generate_structured_json(
-            task_prompt=task_prompt,
-            schema=RISK_REPAIR_PLAN_SCHEMA,
-            system_prompt=(
-                "You are a procurement policy engineer. "
-                "Return strict JSON only and focus on reducing high-severity risks."
-            ),
+        llm_plan = self.llm_client.invoke_structured(
+            StructuredLLMRequest(
+                task_name="risk_repair.plan",
+                task_prompt=RISK_REPAIR_TASK_TEMPLATE.format(
+                    structured_data=structured_data,
+                    risk_summary=risk_payload,
+                ),
+                schema=RISK_REPAIR_PLAN_SCHEMA,
+                system_prompt=RISK_REPAIR_SYSTEM_PROMPT,
+                metadata={"risk_codes": [item.code for item in risk_summary]},
+            )
         )
         if llm_plan is not None:
             try:

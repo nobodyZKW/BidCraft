@@ -35,6 +35,7 @@ from app.agent.types import (
 )
 from app.rules.export_guard import FormalExportGuard
 from app.services.clause_service import ClauseService
+from app.services.agent_decision_service import AgentDecisionService
 from app.services.clarification_review_service import ClarificationReviewService
 from app.services.export_service import ExportService
 from app.services.extraction_service import ExtractionService
@@ -91,6 +92,7 @@ class AgentNodeDependencies:
     export_service: ExportService
     export_guard: FormalExportGuard
     risk_repair_service: RiskRepairService
+    agent_decision_service: AgentDecisionService
 
 
 def _messages_from_state(state: AgentGraphState) -> list[AgentMessage]:
@@ -191,18 +193,26 @@ def _control_auto_repair_with_pe(state: AgentGraphState) -> bool:
     return bool(state.get("user_clarifications", {}).get("auto_repair_with_pe"))
 
 
-def understand_intent(state: AgentGraphState) -> AgentGraphState:
+def understand_intent(
+    state: AgentGraphState,
+    deps: AgentNodeDependencies,
+) -> AgentGraphState:
     """Determine user intent from the request text."""
 
     text = _extract_text_for_intent(state)
-    intent = _infer_intent(text)
+    decision = deps.agent_decision_service.decide_intent(text=text)
+    trace_marker = "node.understand_intent.llm" if decision.used_llm else "node.understand_intent"
+    tool_calls = state.get("tool_calls", [])
+    if decision.used_llm:
+        tool_calls = _append_tool_call(state, "agent_llm.decide_intent")
     return AgentGraphState(
-        user_intent=intent,
+        user_intent=decision.intent,
         error=None,
         current_step="understand_intent",
         next_action="ensure_project",
         messages=_append_message(state, role="user", content=text or "continue"),
-        trace=_append_trace(state, "node.understand_intent"),
+        trace=_append_trace(state, trace_marker),
+        tool_calls=tool_calls,
     )
 
 
@@ -314,24 +324,31 @@ def extract_requirements(
         return _tool_failure(state, marker="extract_requirements", exc=exc)
 
 
-def decide_need_clarification(state: AgentGraphState) -> AgentGraphState:
+def decide_need_clarification(
+    state: AgentGraphState,
+    deps: AgentNodeDependencies,
+) -> AgentGraphState:
     """Route to ask/merge clarification or continue downstream."""
 
-    missing_fields = state.get("missing_fields", [])
-    user_clarifications = state.get("user_clarifications", {})
-    intent = state.get("user_intent", "generate_document")
-    if intent == "view_missing_fields":
-        next_action = "respond"
-    elif missing_fields and user_clarifications:
-        next_action = "merge_clarifications"
-    elif missing_fields:
-        next_action = "ask_for_clarification"
-    else:
-        next_action = "match_clauses"
+    decision = deps.agent_decision_service.decide_clarification(
+        intent=state.get("user_intent", "generate_document"),
+        missing_fields=state.get("missing_fields", []),
+        clarification_questions=state.get("clarification_questions", []),
+        user_clarifications=state.get("user_clarifications", {}),
+    )
+    trace_marker = (
+        "node.decide_need_clarification.llm"
+        if decision.used_llm
+        else "node.decide_need_clarification"
+    )
+    tool_calls = state.get("tool_calls", [])
+    if decision.used_llm:
+        tool_calls = _append_tool_call(state, "agent_llm.decide_clarification")
     return AgentGraphState(
         current_step="decide_need_clarification",
-        next_action=next_action,
-        trace=_append_trace(state, "node.decide_need_clarification"),
+        next_action=decision.next_action,
+        trace=_append_trace(state, trace_marker),
+        tool_calls=tool_calls,
     )
 
 
@@ -403,6 +420,15 @@ def merge_clarifications(
             review_service=deps.clarification_review_service,
         )
         if not review_result.accepted:
+            merged_structured_data = {
+                **state.get("structured_data", {}),
+                **review_result.normalized_clarifications,
+            }
+            remaining_missing_fields = [
+                field
+                for field in state.get("missing_fields", [])
+                if field not in review_result.normalized_clarifications
+            ]
             follow_up_by_field: dict[str, str] = {}
             for item in review_result.follow_up_questions:
                 field = ""
@@ -418,12 +444,12 @@ def merge_clarifications(
             next_questions = [
                 follow_up_by_field.get(field) or question
                 for field, question in zip(
-                    state.get("missing_fields", []),
+                    remaining_missing_fields,
                     state.get("clarification_questions", []),
                 )
             ]
-            while len(next_questions) < len(state.get("missing_fields", [])):
-                field = state.get("missing_fields", [])[len(next_questions)]
+            while len(next_questions) < len(remaining_missing_fields):
+                field = remaining_missing_fields[len(next_questions)]
                 next_questions.append(
                     follow_up_by_field.get(field)
                     or f"Please clarify field: {field}"
@@ -433,12 +459,21 @@ def merge_clarifications(
                     session_id=state.get("session_id"),
                     project_id=state.get("project_id"),
                     operator_id="agent",
-                    missing_fields=state.get("missing_fields", []),
+                    missing_fields=remaining_missing_fields,
                     clarification_questions=next_questions,
                 )
             )
             error_text = "; ".join(review_result.errors) or "Clarification review rejected."
+            kept_fields = sorted(review_result.normalized_clarifications.keys())
+            kept_text = (
+                f" Accepted fields were kept: {', '.join(kept_fields)}."
+                if kept_fields
+                else ""
+            )
             return AgentGraphState(
+                structured_data=merged_structured_data,
+                missing_fields=remaining_missing_fields,
+                clarification_questions=next_questions,
                 user_clarifications=control_payload,
                 pending_human_confirmation=True,
                 options=options_result.options,
@@ -450,7 +485,7 @@ def merge_clarifications(
                     role="assistant",
                     content=(
                         "Clarification review failed. Please fix and resubmit. "
-                        f"Reason: {error_text}"
+                        f"Reason: {error_text}{kept_text}"
                     ),
                 ),
                 tool_calls=_append_tool_call(
@@ -602,31 +637,32 @@ def validate_document(
         return _tool_failure(state, marker="validate_document", exc=exc)
 
 
-def decide_repair_or_continue(state: AgentGraphState) -> AgentGraphState:
+def decide_repair_or_continue(
+    state: AgentGraphState,
+    deps: AgentNodeDependencies,
+) -> AgentGraphState:
     """Branch based on risks, intent, and draft downgrade preference."""
 
-    intent = state.get("user_intent", "generate_document")
-    can_export_formal = bool(state.get("can_export_formal", False))
-    allow_draft = _control_allow_draft(state)
-    auto_repair = _control_auto_repair_with_pe(state)
-    if intent == "override_payment_clause":
-        next_action = "respond"
-    elif not can_export_formal:
-        if auto_repair:
-            next_action = "auto_repair_with_pe"
-        elif intent == "draft_export" or allow_draft:
-            next_action = "render_preview"
-        else:
-            next_action = "build_fix_options"
-    else:
-        if intent in {"formal_export", "draft_export", "generate_document"}:
-            next_action = "render_preview"
-        else:
-            next_action = "respond"
+    decision = deps.agent_decision_service.decide_repair(
+        intent=state.get("user_intent", "generate_document"),
+        can_export_formal=bool(state.get("can_export_formal", False)),
+        allow_draft=_control_allow_draft(state),
+        auto_repair=_control_auto_repair_with_pe(state),
+        risk_summary=state.get("risk_summary", []),
+    )
+    trace_marker = (
+        "node.decide_repair_or_continue.llm"
+        if decision.used_llm
+        else "node.decide_repair_or_continue"
+    )
+    tool_calls = state.get("tool_calls", [])
+    if decision.used_llm:
+        tool_calls = _append_tool_call(state, "agent_llm.decide_repair")
     return AgentGraphState(
         current_step="decide_repair_or_continue",
-        next_action=next_action,
-        trace=_append_trace(state, "node.decide_repair_or_continue"),
+        next_action=decision.next_action,
+        trace=_append_trace(state, trace_marker),
+        tool_calls=tool_calls,
     )
 
 

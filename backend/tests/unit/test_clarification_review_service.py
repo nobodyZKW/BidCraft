@@ -8,7 +8,7 @@ class _StubLlmClient:
     def __init__(self, payload: dict | None):
         self.payload = payload
 
-    def generate_structured_json(self, **kwargs):  # type: ignore[no-untyped-def]
+    def invoke_structured(self, request):  # type: ignore[no-untyped-def]
         return self.payload
 
 
@@ -51,3 +51,33 @@ def test_clarification_review_service_fallback_rejects_invalid_payload() -> None
     assert result.accepted is False
     assert result.used_llm is False
     assert result.errors
+
+
+def test_clarification_review_service_fallback_normalizes_user_friendly_values() -> None:
+    service = ClarificationReviewService(_StubLlmClient(None))
+    result = service.review(
+        messages=[AgentMessage(role="user", content="补充澄清")],
+        raw_input_text="补充澄清",
+        structured_data={},
+        missing_fields=[
+            "budget_amount",
+            "payment_terms",
+            "acceptance_standard",
+            "delivery_days",
+            "warranty_months",
+        ],
+        clarification_questions=[],
+        user_clarifications={
+            "budget_amount": "300万元",
+            "payment_terms": "30/60/10",
+            "acceptance_standard": "国家标准",
+            "delivery_days": "30天",
+            "warranty_months": "12个月",
+        },
+    )
+    assert result.accepted is True
+    assert result.normalized_clarifications["budget_amount"] == 3000000
+    assert result.normalized_clarifications["payment_terms"] == "30/60/10"
+    assert result.normalized_clarifications["acceptance_standard"] == "按国家标准验收"
+    assert result.normalized_clarifications["delivery_days"] == 30
+    assert result.normalized_clarifications["warranty_months"] == 12

@@ -64,15 +64,15 @@ def build_agent_graph(
 
     graph = StateGraph(AgentGraphState)
 
-    graph.add_node("understand_intent", understand_intent)
+    graph.add_node("understand_intent", partial(understand_intent, deps=deps))
     graph.add_node("ensure_project", partial(ensure_project, deps=deps))
     graph.add_node("extract_requirements", partial(extract_requirements, deps=deps))
-    graph.add_node("decide_need_clarification", decide_need_clarification)
+    graph.add_node("decide_need_clarification", partial(decide_need_clarification, deps=deps))
     graph.add_node("ask_for_clarification", ask_for_clarification)
     graph.add_node("merge_clarifications", partial(merge_clarifications, deps=deps))
     graph.add_node("match_clauses", partial(match_clauses, deps=deps))
     graph.add_node("validate_document", partial(validate_document, deps=deps))
-    graph.add_node("decide_repair_or_continue", decide_repair_or_continue)
+    graph.add_node("decide_repair_or_continue", partial(decide_repair_or_continue, deps=deps))
     graph.add_node("auto_repair_with_pe", partial(auto_repair_with_pe, deps=deps))
     graph.add_node("build_fix_options", build_fix_options)
     graph.add_node("render_preview", partial(render_preview, deps=deps))

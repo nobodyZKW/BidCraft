@@ -9,7 +9,7 @@ class _StubLlmClient:
     def __init__(self, payload: dict | None):
         self.payload = payload
 
-    def generate_structured_json(self, **kwargs):  # type: ignore[no-untyped-def]
+    def invoke_structured(self, request):  # type: ignore[no-untyped-def]
         return self.payload
 
 

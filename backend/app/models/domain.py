@@ -57,11 +57,18 @@ class Clause(BaseModel):
     locked: bool = False
 
 
+class KnowledgeCitation(BaseModel):
+    source_id: str
+    title: str
+    excerpt: str
+
+
 class MatchedSection(BaseModel):
     section_id: str
     selected_clause_id: str
     alternatives: list[str]
     reason: str
+    citations: list[KnowledgeCitation] = Field(default_factory=list)
 
 
 class RiskItem(BaseModel):
@@ -69,6 +76,7 @@ class RiskItem(BaseModel):
     message: str
     severity: RiskSeverity
     location: str
+    citations: list[KnowledgeCitation] = Field(default_factory=list)
 
 
 class ValidationResult(BaseModel):

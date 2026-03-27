@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.api.routes_agent import router_agent
+from app.api.routes_eval import router_eval
 from app.core.settings import settings
 
 
@@ -30,13 +31,19 @@ app = FastAPI(
 )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
+    allow_origins=[
+        "http://127.0.0.1:3000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3001",
+        "http://localhost:3001",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 app.include_router(router)
 app.include_router(router_agent)
+app.include_router(router_eval)
 app.mount("/exports", StaticFiles(directory=settings.export_dir), name="exports")
 
 

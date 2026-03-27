@@ -2,11 +2,17 @@ from __future__ import annotations
 
 from app.models.domain import Clause, MatchedSection
 from app.repositories.clause_repository import ClauseRepository
+from app.services.knowledge_retrieval_service import KnowledgeRetrievalService
 
 
 class ClauseService:
-    def __init__(self, clause_repository: ClauseRepository):
+    def __init__(
+        self,
+        clause_repository: ClauseRepository,
+        knowledge_retrieval_service: KnowledgeRetrievalService | None = None,
+    ):
         self.clause_repository = clause_repository
+        self.knowledge_retrieval_service = knowledge_retrieval_service
 
     def _apply_overrides(
         self,
@@ -46,8 +52,23 @@ class ClauseService:
                 MatchedSection(
                     section_id=clause.clause_type,
                     selected_clause_id=clause.clause_id,
-                    alternatives=[item.clause_id for item in alternatives if item.clause_id != clause.clause_id],
-                    reason=f"匹配 procurement_type={structured_data.get('procurement_type')} + method={structured_data.get('method')}",
+                    alternatives=[
+                        item.clause_id
+                        for item in alternatives
+                        if item.clause_id != clause.clause_id
+                    ],
+                    reason=(
+                        f"匹配 procurement_type={structured_data.get('procurement_type')} "
+                        f"+ method={structured_data.get('method')}"
+                    ),
+                    citations=(
+                        self.knowledge_retrieval_service.cite_clause(
+                            clause=clause,
+                            structured_data=structured_data,
+                        )
+                        if self.knowledge_retrieval_service is not None
+                        else []
+                    ),
                 )
             )
         return selected, sections

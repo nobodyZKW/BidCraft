@@ -5,6 +5,7 @@ from app.agent.nodes import AgentNodeDependencies
 from app.agent.state import create_initial_state
 from app.api.dependencies import get_project_service
 from app.llm.deepseek_client import DeepSeekClient
+from app.services.agent_decision_service import AgentDecisionService
 from app.services.clarification_review_service import ClarificationReviewService
 from app.services.risk_repair_service import RiskRepairService
 from app.tools.clause_tools import list_clause_alternatives_tool
@@ -21,6 +22,7 @@ def _deps() -> AgentNodeDependencies:
         export_service=service.export_service,
         export_guard=service.export_guard,
         risk_repair_service=RiskRepairService(DeepSeekClient()),
+        agent_decision_service=AgentDecisionService(DeepSeekClient()),
     )
 
 

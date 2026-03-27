@@ -106,3 +106,22 @@ def test_generate_formal_auto_fallback_to_draft() -> None:
     parsed = urlparse(payload["file_url"])
     file_resp = client.get(parsed.path)
     assert file_resp.status_code == 200
+
+
+def test_agent_chat_response_includes_trace_summary() -> None:
+    client = TestClient(app)
+    resp = client.post(
+        "/api/agent/chat",
+        json={
+            "message": (
+                "Server procurement project, budget 3000000 CNY, delivery 45 days, "
+                "payment 30/60/10, acceptance by test report, warranty 24 months."
+            ),
+            "session_id": "trace_summary_case",
+        },
+    )
+    assert resp.status_code == 200
+    payload = resp.json()
+    assert "trace" in payload["artifacts"]
+    assert "trace_summary" in payload["artifacts"]
+    assert payload["artifacts"]["trace_summary"]["run_id"]

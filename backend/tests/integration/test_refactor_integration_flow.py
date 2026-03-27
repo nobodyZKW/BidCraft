@@ -38,9 +38,11 @@ def test_create_extract_match_validate_render_export_draft() -> None:
     matched = client.post(f"/api/projects/{project_id}/clauses/match", json={})
     assert matched.status_code == 200
     assert matched.json()["sections"]
+    assert matched.json()["sections"][0]["citations"]
 
     validated = client.post(f"/api/projects/{project_id}/validate", json={})
     assert validated.status_code == 200
+    assert all("citations" in item for item in validated.json()["risk_summary"])
 
     rendered = client.post(f"/api/projects/{project_id}/render", json={})
     assert rendered.status_code == 200
@@ -141,6 +143,7 @@ def test_override_clause_then_revalidate() -> None:
     assert payment_type_sections
     alternatives = payment_type_sections[0].alternatives
     assert alternatives
+    assert payment_type_sections[0].citations
 
     overridden = override_clause_selection_tool(
         OverrideClauseSelectionToolInput(

@@ -144,3 +144,47 @@ CLARIFICATION_REVIEW_SCHEMA = {
     ],
     "additionalProperties": False,
 }
+
+
+INTENT_DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "intent": {
+            "type": "string",
+            "enum": [
+                "view_missing_fields",
+                "override_payment_clause",
+                "formal_export",
+                "draft_export",
+                "generate_document",
+            ],
+        },
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "reason": {"type": "string"},
+    },
+    "required": ["intent", "confidence", "reason"],
+    "additionalProperties": False,
+}
+
+
+NEXT_ACTION_DECISION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "next_action": {
+            "type": "string",
+            "enum": [
+                "respond",
+                "merge_clarifications",
+                "ask_for_clarification",
+                "match_clauses",
+                "auto_repair_with_pe",
+                "build_fix_options",
+                "render_preview",
+            ],
+        },
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+        "reason": {"type": "string"},
+    },
+    "required": ["next_action", "confidence", "reason"],
+    "additionalProperties": False,
+}

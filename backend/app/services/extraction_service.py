@@ -5,8 +5,9 @@ from typing import Any
 
 from jsonschema import ValidationError, validate
 
-from app.llm.deepseek_client import DeepSeekClient
+from app.agent.prompts import EXTRACTION_SYSTEM_PROMPT, EXTRACTION_TASK_TEMPLATE
 from app.schemas.json_schemas import EXTRACTION_SCHEMA
+from app.llm.types import StructuredLLMClient, StructuredLLMRequest
 
 
 MVP_REQUIRED_FIELDS = [
@@ -30,7 +31,7 @@ CLARIFY_QUESTIONS = {
 
 
 class ExtractionService:
-    def __init__(self, llm_client: DeepSeekClient):
+    def __init__(self, llm_client: StructuredLLMClient):
         self.llm_client = llm_client
 
     @staticmethod
@@ -170,9 +171,16 @@ class ExtractionService:
     def extract(self, raw_input_text: str) -> dict[str, Any]:
         last_error: str = ""
         for _ in range(2):
-            llm_result = self.llm_client.extract_structured_json(
-                raw_input_text=raw_input_text,
-                schema=EXTRACTION_SCHEMA,
+            llm_result = self.llm_client.invoke_structured(
+                StructuredLLMRequest(
+                    task_name="extraction.requirements",
+                    task_prompt=EXTRACTION_TASK_TEMPLATE.format(
+                        raw_input_text=raw_input_text
+                    ),
+                    schema=EXTRACTION_SCHEMA,
+                    system_prompt=EXTRACTION_SYSTEM_PROMPT,
+                    metadata={"raw_input_preview": raw_input_text[:120]},
+                )
             )
             if llm_result is None:
                 last_error = "LLM unavailable or returned invalid response."

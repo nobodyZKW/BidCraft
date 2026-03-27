@@ -19,6 +19,9 @@ class ClauseRepository:
         payload = json.loads(self.clause_file.read_text(encoding="utf-8"))
         return [Clause.model_validate(item) for item in payload]
 
+    def load_all(self) -> list[Clause]:
+        return self._load_all()
+
     @staticmethod
     def _version_rank(version: str) -> tuple[int, ...]:
         nums = re.findall(r"\d+", version or "")

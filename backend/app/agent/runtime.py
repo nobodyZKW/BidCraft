@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from time import perf_counter
 from typing import Any
 from uuid import uuid4
 
+from app.agent.run_logger import AgentRunLogEntry, AgentRunLogger
 from app.agent.state import AgentGraphState, create_initial_state
 from app.agent.types import AgentMessage, AgentResponsePayload
 from app.repositories.agent_state_repository import AgentStateRepository
@@ -15,6 +17,19 @@ class AgentWorkflowRunner:
 
     workflow: Any
     state_repository: AgentStateRepository
+    run_logger: AgentRunLogger | None = None
+
+    @staticmethod
+    def _trace_summary(state: AgentGraphState) -> dict[str, Any]:
+        trace = state.get("trace", [])
+        tool_calls = state.get("tool_calls", [])
+        llm_decisions = [item for item in tool_calls if item.startswith("agent_llm.")]
+        return {
+            "trace_count": len(trace),
+            "tool_call_count": len(tool_calls),
+            "llm_decision_count": len(llm_decisions),
+            "last_trace": trace[-1] if trace else "",
+        }
 
     @staticmethod
     def _to_serializable_state(state: AgentGraphState) -> dict[str, Any]:
@@ -33,7 +48,12 @@ class AgentWorkflowRunner:
         return AgentGraphState(**payload)
 
     @staticmethod
-    def _build_response(state: AgentGraphState) -> AgentResponsePayload:
+    def _build_response(
+        state: AgentGraphState,
+        *,
+        run_id: str,
+        duration_ms: int,
+    ) -> AgentResponsePayload:
         assistant_message = ""
         messages = state.get("messages", [])
         if messages:
@@ -59,6 +79,12 @@ class AgentWorkflowRunner:
                 "preview_html": state.get("preview_html", ""),
                 "file_path": state.get("file_path", ""),
                 "error": state.get("error"),
+                "trace": state.get("trace", []),
+                "trace_summary": {
+                    **AgentWorkflowRunner._trace_summary(state),
+                    "run_id": run_id,
+                    "duration_ms": duration_ms,
+                },
             },
         )
 
@@ -91,13 +117,32 @@ class AgentWorkflowRunner:
             existing.update(user_clarifications)
             state["user_clarifications"] = existing
 
+        run_id = uuid4().hex
+        started = perf_counter()
         next_state = self._run(state)
+        duration_ms = int((perf_counter() - started) * 1000)
         if next_state.get("project_id"):
             self.state_repository.save_state(
                 next_state["project_id"],
                 self._to_serializable_state(next_state),
             )
-        return self._build_response(next_state)
+        if self.run_logger is not None:
+            self.run_logger.log(
+                AgentRunLogEntry(
+                    run_id=run_id,
+                    session_id=next_state.get("session_id", state.get("session_id", "")),
+                    project_id=next_state.get("project_id"),
+                    current_step=next_state.get("current_step", ""),
+                    next_action=next_state.get("next_action", ""),
+                    requires_user_input=bool(next_state.get("pending_human_confirmation", False)),
+                    duration_ms=duration_ms,
+                    tool_calls=next_state.get("tool_calls", []),
+                    trace=next_state.get("trace", []),
+                    trace_summary=self._trace_summary(next_state),
+                    created_at=AgentRunLogger.build_created_at(),
+                )
+            )
+        return self._build_response(next_state, run_id=run_id, duration_ms=duration_ms)
 
     def continue_project(
         self,
@@ -117,12 +162,31 @@ class AgentWorkflowRunner:
             existing = dict(state.get("user_clarifications", {}))
             existing.update(user_clarifications)
             state["user_clarifications"] = existing
+        run_id = uuid4().hex
+        started = perf_counter()
         next_state = self._run(state)
+        duration_ms = int((perf_counter() - started) * 1000)
         self.state_repository.save_state(
             project_id,
             self._to_serializable_state(next_state),
         )
-        return self._build_response(next_state)
+        if self.run_logger is not None:
+            self.run_logger.log(
+                AgentRunLogEntry(
+                    run_id=run_id,
+                    session_id=next_state.get("session_id", state.get("session_id", "")),
+                    project_id=project_id,
+                    current_step=next_state.get("current_step", ""),
+                    next_action=next_state.get("next_action", ""),
+                    requires_user_input=bool(next_state.get("pending_human_confirmation", False)),
+                    duration_ms=duration_ms,
+                    tool_calls=next_state.get("tool_calls", []),
+                    trace=next_state.get("trace", []),
+                    trace_summary=self._trace_summary(next_state),
+                    created_at=AgentRunLogger.build_created_at(),
+                )
+            )
+        return self._build_response(next_state, run_id=run_id, duration_ms=duration_ms)
 
     def get_project_state(self, project_id: str) -> dict[str, Any]:
         stored = self.state_repository.get_state(project_id)
